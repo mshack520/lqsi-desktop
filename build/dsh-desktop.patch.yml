@@ -76,3 +76,22 @@
       config:
         resources: !!js process.env.DSH_DESKTOP_OFFICE_RESOURCES
         cli: !!js process.env.DSH_DESKTOP_OFFICE_CLI
+
+# 灵启品牌层：品牌位、图标、启动动画设置页、MES 查询；这些包随仓库发布。
+- insert:
+    - id: dsh-lingqi-brand-icon
+      name: dsh-lingqi-brand-icon
+    - id: dsh-lingqi-brand
+      name: dsh-lingqi-brand
+    - id: dsh-startup-screen
+      name: 'dsh-startup-screen'
+    - id: dsh-mes-query
+      name: dsh-mes-query
+      config:
+        resources: !!js process.resourcesPath
+    - id: scx-mes-workbench
+      name: '@scx/dsh-workbench-prototype'
+      config:
+        systemName: "AI 智能平台系统"
+        siteUrl: ""
+        apiOperations: "[]"
