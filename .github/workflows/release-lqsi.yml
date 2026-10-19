@@ -1,0 +1,78 @@
+name: 构建并发布 LQ SI（手动触发）
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: '本仓库 owner/name（更新源用它拼地址）'
+        required: true
+        default: 'OWNER/lqsi'
+      version:
+        description: '版本号（必须大于当前 0.11.27，例如 0.12.0）'
+        required: true
+        default: '0.12.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm install --no-audit --no-fund
+
+      - name: 设置版本号
+        shell: bash
+        run: npm version "${{ inputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: 应用品牌（名称/图标/启动动画/插件）
+        run: node scripts/apply-lqsi-brand.mjs
+        env:
+          LQSI_REPO: ${{ inputs.repo }}
+
+      - name: 把更新源改到本仓库
+        run: node scripts/patch-update-source.mjs --repo ${{ inputs.repo }}
+        env:
+          LQSI_REPO: ${{ inputs.repo }}
+
+      - name: 链接本地插件
+        run: npm install --no-audit --no-fund
+
+      - name: 构建前端与主进程
+        run: npm run build
+
+      - name: 打包 Windows 安装包（不签名、不自动发布）
+        run: npx electron-builder --win nsis --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: 生成版本目录 versions.json
+        shell: bash
+        run: node scripts/make-versions-json.mjs
+
+      - name: 列出产物
+        shell: bash
+        run: ls -lh dist | head -30
+
+      - name: 发布到 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: LQ SI v${{ inputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            dist/*.exe
+            dist/latest.yml
+            dist/versions.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
