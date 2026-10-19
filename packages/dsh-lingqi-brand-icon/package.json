@@ -1,0 +1,20 @@
+{
+  "name": "dsh-lingqi-brand-icon",
+  "description": "LQ SI 品牌图标路由：从插件内置资源提供图标，适用于任意企业安装目录",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.4"
+  }
+}

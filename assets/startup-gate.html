@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>LQ SI</title>
+    <link rel="stylesheet" href="startup/splash.css" />
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+      }
+
+      #dsh-startup-root {
+        background: transparent;
+      }
+
+      #dsh-startup-root.dsu-boot {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        background: transparent;
+      }
+
+      #dsh-startup-root.dsu-boot::after {
+        display: none;
+      }
+
+      .lqsi-startup-fallback,
+      .lqsi-startup-waiting {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483001;
+        display: grid;
+        place-content: center;
+        gap: 14px;
+        padding: 32px;
+        color: #f3f4f6;
+        background: #111;
+        font: 16px/1.5 "Microsoft YaHei", "Segoe UI", sans-serif;
+        text-align: center;
+      }
+
+      .lqsi-startup-fallback h1,
+      .lqsi-startup-waiting h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+
+      .lqsi-startup-fallback p,
+      .lqsi-startup-waiting p {
+        margin: 0;
+        color: #b8bbc2;
+      }
+
+      .lqsi-startup-fallback input,
+      .lqsi-startup-fallback button {
+        min-width: 280px;
+        padding: 11px 14px;
+        border: 1px solid #656a73;
+        border-radius: 8px;
+        font: inherit;
+      }
+
+      .lqsi-startup-fallback input {
+        color: #fff;
+        background: #202124;
+      }
+
+      .lqsi-startup-fallback button {
+        color: #fff;
+        background: #d92d39;
+        cursor: pointer;
+      }
+
+      .lqsi-startup-fallback button:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      .lqsi-startup-fallback [role="status"] {
+        min-height: 24px;
+        color: #f0aaaa;
+      }
+    </style>
+    <script>
+      (function () {
+        var query = new URLSearchParams(location.search)
+        var dark = query.get('theme') === 'dark'
+        var config = {}
+        try { config = JSON.parse(query.get('config') || '{}') } catch (_) {}
+        window.__DSH_STARTUP__ = Object.assign({
+          enabled: true,
+          mode: 'always',
+          theme: dark ? 'dark' : 'light',
+          speed: 1,
+          requireInteraction: true,
+          allowSkip: false,
+          sound: false,
+          voice: false,
+          voiceCue: false,
+          identity: 'LQ SI 用户',
+          identityId: 'LQSI-001',
+          brand1: 'LQ SI',
+          brand2: 'SMART INTELLIGENCE',
+          brand3a: 'DSH',
+          brand3b: 'DESKTOP',
+          welcomeBox: 'LQ SI DESKTOP',
+          footer: 'POWERED BY LQ SI'
+        }, config)
+        window.__DSH_STARTUP_PREVIEW__ = query.get('preview') === 'true'
+        window.__DSH_NATIVE_STARTUP_GATE__ = window.__DSH_STARTUP_PREVIEW__ !== true
+        window.__DSH_STARTUP_ICON_URL__ = 'icon.png'
+        window.__DSH_STARTUP_SCRIPT_URL__ = 'startup/splash.js'
+
+        window.addEventListener('dsh-startup:done', function () {
+          if (window.__DSH_STARTUP_PREVIEW__) {
+            document.body.innerHTML = '<main class="lqsi-startup-waiting" role="status"><h1>预览已结束</h1><p>关闭此窗口即可返回启动动画设置。</p></main>'
+          } else {
+            document.body.innerHTML = '<main class="lqsi-startup-waiting" role="status"><h1>正在启动 LQ SI</h1><p>正在连接工作区，请稍候。</p></main>'
+          }
+        }, { once: true })
+
+        function showFallback() {
+          if (document.querySelector('.lqsi-startup-fallback')) return
+          var main = document.createElement('main')
+          main.className = 'lqsi-startup-fallback'
+          var title = document.createElement('h1')
+          title.textContent = '启动动画暂不可用'
+          var message = document.createElement('p')
+          message.textContent = '验证身份后继续启动 LQ SI。'
+          var input = document.createElement('input')
+          input.type = 'password'
+          input.autocomplete = 'current-password'
+          input.maxLength = 64
+          input.placeholder = '输入启动口令'
+          var button = document.createElement('button')
+          button.type = 'button'
+          button.textContent = '验证并继续'
+          var status = document.createElement('div')
+          status.setAttribute('role', 'status')
+
+          async function verify() {
+            var bridge = window.dshDesktop
+            if (!bridge || typeof bridge.verifyStartupPassword !== 'function') {
+              status.textContent = '验证服务未就绪，请重新启动应用。'
+              return
+            }
+            button.disabled = true
+            try {
+              var result = await bridge.verifyStartupPassword(String(input.value || ''))
+              input.value = ''
+              if (result && result.ok === true) {
+                window.dispatchEvent(new CustomEvent('dsh-startup:done'))
+                return
+              }
+              status.textContent = '启动口令不正确。'
+            } catch (error) {
+              input.value = ''
+              status.textContent = '验证服务暂不可用，请重新启动应用。'
+            } finally {
+              button.disabled = false
+            }
+          }
+
+          button.addEventListener('click', verify)
+          input.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') void verify()
+          })
+          main.append(title, message, input, button, status)
+          document.body.appendChild(main)
+          input.focus()
+          var bridge = window.dshDesktop
+          if (bridge && typeof bridge.verifyStartupAutoLogin === 'function') {
+            bridge.verifyStartupAutoLogin().then(function (result) {
+              if (result && result.ok === true) window.dispatchEvent(new CustomEvent('dsh-startup:done'))
+            }).catch(function () {
+              status.textContent = '自动登录暂不可用，请输入启动口令。'
+            })
+          }
+        }
+
+        window.addEventListener('error', function (event) {
+          if (event.target instanceof HTMLScriptElement || event.target instanceof HTMLLinkElement) showFallback()
+        }, true)
+        window.setTimeout(function () {
+          var root = document.getElementById('dsh-startup-root')
+          if (!root || root.childElementCount === 0) showFallback()
+        }, 10000)
+      })()
+    </script>
+    <script defer src="startup/splash.js"></script>
+  </head>
+  <body>
+    <div id="dsh-startup-root" class="dsu-root dsu-boot"></div>
+  </body>
+</html>

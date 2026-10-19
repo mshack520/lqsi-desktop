@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <title>LQ SI</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+        background: #000;
+        color: #fff;
+      }
+      * { box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+      body { background: #000; }
+      main {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        align-content: center;
+        justify-items: center;
+        padding: 24px;
+        text-align: center;
+        transform: translateY(72px);
+      }
+      .mark {
+        display: block;
+        width: 180px;
+        height: 180px;
+        object-fit: contain;
+        image-rendering: auto;
+      }
+      h1 {
+        margin: 14px 0 8px;
+        font-size: 45px;
+        line-height: 1.2;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-indent: 0.2em;
+      }
+      .name {
+        margin: 0;
+        font-family: "Bahnschrift", "Arial Narrow", sans-serif;
+        font-size: 34px;
+        line-height: 1.15;
+        font-weight: 700;
+        letter-spacing: 0.35em;
+        text-indent: 0.35em;
+      }
+      .subtitle {
+        margin: 12px 0 0;
+        color: #8d8d91;
+        font-family: "Cascadia Mono", Consolas, monospace;
+        font-size: 13px;
+        letter-spacing: 0.42em;
+        text-indent: 0.42em;
+      }
+    </style>
+  </head>
+  <body>
+    <main aria-label="灵启智能 LQ SI">
+      <img class="mark" src="icon.png" alt="" onerror="this.onerror=null;this.src='app-icon.png'" />
+      <h1>灵启智能</h1>
+      <p class="name">LQ SI</p>
+      <p class="subtitle">LQ SI DESKTOP</p>
+    </main>
+  </body>
+</html>
