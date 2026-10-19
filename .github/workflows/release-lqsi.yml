@@ -39,6 +39,9 @@ jobs:
       - name: 把更新源改到本仓库
         run: node scripts/patch-update-source.mjs --repo "$env:LQSI_REPO"
 
+      - name: 接入原生启动舞台（动画/身份确认/启动口令/设置页）
+        run: node scripts/apply-lqsi-startup.mjs
+
       - name: 链接本地插件
         run: npm install --no-audit --no-fund
 
