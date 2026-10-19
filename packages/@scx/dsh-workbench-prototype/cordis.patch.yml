@@ -1,0 +1,4 @@
+# Register the Host and Client halves of the MES workbench in the DSH profile.
+- insert:
+    - id: scx-mes-workbench
+      name: '@scx/dsh-workbench-prototype'
