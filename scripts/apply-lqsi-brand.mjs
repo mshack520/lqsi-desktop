@@ -13,7 +13,11 @@ import { fileURLToPath } from 'node:url'
 
 const root = process.cwd()
 const kit = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const OWNER_REPO = process.env.LQSI_REPO || 'mshack520/lqsi-desktop'
+const OWNER_REPO = (process.env.LQSI_REPO || 'mshack520/lqsi-desktop').trim()
+const REPO_PATTERN = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/
+if (!REPO_PATTERN.test(OWNER_REPO) || /^OWNER\//i.test(OWNER_REPO)) {
+  throw new Error(`LQSI_REPO 不合法：「${OWNER_REPO}」—— 必须是 owner/name，例如 mshack520/lqsi-desktop`)
+}
 
 const PLUGINS = ['dsh-lingqi-brand', 'dsh-lingqi-brand-icon', 'dsh-startup-screen', 'dsh-mes-query']
 const ASSETS = ['splash.html', 'startup-gate.html', 'dsh-loader.gif', 'dsh-loader-dark.gif', 'icon.png', 'icon.ico']
