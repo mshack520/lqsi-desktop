@@ -20,7 +20,15 @@ if (!REPO_PATTERN.test(OWNER_REPO) || /^OWNER\//i.test(OWNER_REPO)) {
 }
 
 const PLUGINS = ['dsh-lingqi-brand', 'dsh-lingqi-brand-icon', 'dsh-startup-screen', 'dsh-mes-query']
+// 带 @scope 的私有包：MES 工作台原型（工作台里的「AI 智能系统」入口）
+const SCX_PLUGINS = ['@scx/dsh-workbench-prototype']
 const ASSETS = ['splash.html', 'startup-gate.html', 'dsh-loader.gif', 'dsh-loader-dark.gif', 'icon.png', 'icon.ico']
+// 启动动画窗口要加载 splash.html + startup/splash.js(.css)，缺一个就只闪一下。
+const EXTRA_RESOURCES = [
+  { from: 'build/splash.html', to: 'splash.html' },
+  { from: 'build/startup-gate.html', to: 'startup-gate.html' },
+  { from: 'build/startup', to: 'startup' }
+]
 
 const loadJson = (p) => JSON.parse(readFileSync(p, 'utf8'))
 const saveJson = (p, v) => writeFileSync(p, JSON.stringify(v, null, 2) + '\n')
@@ -39,6 +47,12 @@ b.nsis = { ...(b.nsis || {}), artifactName: 'lq-si-windows-${arch}-setup.${ext}'
 b.publish = [{ provider: 'generic', url: `https://github.com/${OWNER_REPO}/releases/latest/download/` }]
 b.win = { ...(b.win || {}), verifyUpdateCodeSignature: false }
 if (b.win && 'signtoolOptions' in b.win) delete b.win.signtoolOptions
+
+// 启动动画 / 身份屏所需的资源目录必须真的打进安装包
+b.extraResources = Array.isArray(b.extraResources) ? b.extraResources : []
+for (const entry of EXTRA_RESOURCES) {
+  if (!b.extraResources.some((item) => item && item.to === entry.to)) b.extraResources.push(entry)
+}
 
 pkg.version = process.env.LQSI_VERSION || pkg.version
 
@@ -70,11 +84,12 @@ const pkgsDir = join(root, 'packages')
 mkdirSync(pkgsDir, { recursive: true })
 
 let copiedPlugins = 0
-for (const name of PLUGINS) {
+for (const name of [...PLUGINS, ...SCX_PLUGINS]) {
   const src = join(kit, 'packages', name)
   if (!existsSync(src)) continue
   const dst = join(pkgsDir, name)
   if (!samePath(src, dst)) {
+    mkdirSync(dirname(dst), { recursive: true })
     cpSync(src, dst, { recursive: true })
     copiedPlugins++
   }
@@ -83,7 +98,7 @@ for (const name of PLUGINS) {
 // ---------- 4) 以 file: 依赖把插件接进主工程 ----------
 pkg.dependencies = pkg.dependencies || {}
 const wired = []
-for (const name of PLUGINS) {
+for (const name of [...PLUGINS, ...SCX_PLUGINS]) {
   if (existsSync(join(pkgsDir, name))) {
     pkg.dependencies[name] = `file:packages/${name}`
     wired.push(name)
