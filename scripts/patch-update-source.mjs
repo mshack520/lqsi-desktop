@@ -8,7 +8,11 @@ import { join } from 'node:path'
 
 const args = process.argv.slice(2)
 const get = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d }
-const repo = get('repo') || process.env.LQSI_REPO || 'OWNER/lqsi'
+const repo = (get('repo') || process.env.LQSI_REPO || 'mshack520/lqsi-desktop').trim()
+const REPO_PATTERN = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/
+if (!REPO_PATTERN.test(repo) || /^OWNER\//i.test(repo) || /^NAME\//i.test(repo)) {
+  throw new Error(`更新源仓库名不合法：「${repo}」—— 必须是 owner/name，例如 mshack520/lqsi-desktop`)
+}
 const prefix = get('tag-prefix', 'v')
 const base = `https://github.com/${repo}`
 
