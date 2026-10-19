@@ -46,6 +46,8 @@ const STAGE_TIMEOUT_MS = 120000
 
 let registered = false
 let stageWindow: BrowserWindow | null = null
+/** 一次运行只播一次：Harness 重启、故障恢复等路径也会走 showSplash()。 */
+let playedThisSession = false
 
 function startupFile(): string {
   return join(app.getPath('userData'), 'harness', 'dsh-startup.json')
@@ -141,7 +143,9 @@ export function showStartupStage(owner: BrowserWindow | null): Promise<void> {
   const raw = readRaw()
   const cfg = configOf(raw)
   if (cfg.enabled === false) return Promise.resolve()
+  if (playedThisSession) return Promise.resolve()
   if (cfg.mode === 'once' && raw.lastShownVersion === app.getVersion()) return Promise.resolve()
+  playedThisSession = true
 
   return new Promise<void>((resolve) => {
     const win = createStageWindow(false)
