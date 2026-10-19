@@ -3,10 +3,6 @@ name: 构建并发布 LQ SI（手动触发）
 on:
   workflow_dispatch:
     inputs:
-      repo:
-        description: '本仓库 owner/name（更新源用它拼地址）'
-        required: true
-        default: 'OWNER/lqsi'
       version:
         description: '版本号（必须大于当前 0.11.27，例如 0.12.0）'
         required: true
@@ -14,6 +10,9 @@ on:
 
 permissions:
   contents: write
+
+env:
+  LQSI_REPO: mshack520/lqsi-desktop
 
 jobs:
   build:
@@ -36,13 +35,9 @@ jobs:
 
       - name: 应用品牌（名称/图标/启动动画/插件）
         run: node scripts/apply-lqsi-brand.mjs
-        env:
-          LQSI_REPO: ${{ inputs.repo }}
 
       - name: 把更新源改到本仓库
-        run: node scripts/patch-update-source.mjs --repo ${{ inputs.repo }}
-        env:
-          LQSI_REPO: ${{ inputs.repo }}
+        run: node scripts/patch-update-source.mjs --repo "$env:LQSI_REPO"
 
       - name: 链接本地插件
         run: npm install --no-audit --no-fund
@@ -51,7 +46,7 @@ jobs:
         run: npm run build
 
       - name: 打包 Windows 安装包（不签名、不自动发布）
-        run: npx electron-builder --win nsis --x64 --publish never
+        run: node scripts/electron-builder-windows.mjs --win --x64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
