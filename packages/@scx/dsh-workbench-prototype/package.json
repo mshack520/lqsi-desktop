@@ -1,0 +1,71 @@
+{
+  "name": "@scx/dsh-workbench-prototype",
+  "version": "0.0.1",
+  "description": "Configurable ERP/MES workbench bundled with DSH Desktop",
+  "private": true,
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/types/index.d.ts",
+  "files": [
+    "README.md",
+    "cordis.patch.yml",
+    "lib/*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "BSD-3-Clause",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.0-rc <5",
+    "@deepseek-ai/schemastery": "^3.18.2",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-client-ui-settings": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-client-ui-layout": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-api-remotes": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-client-connection": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-client-ui-session": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-tools": ">=0.0.1-rc <2",
+    "react": "^18.2.0"
+  },
+  "dependencies": {
+    "mssql": "^12.2.0",
+    "mysql2": "^3.14.5",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/mssql": "^9.1.8",
+    "@types/node": "^24.13.3",
+    "@types/pg": "^8.15.5",
+    "typescript": "^5.9.0"
+  },
+  "scripts": {
+    "build": "node scripts/build-host.mjs && node scripts/build-client.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:client": "node scripts/build-client.mjs",
+    "check:package": "node scripts/check-workbench-package.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "dsh-desktop-workbenches",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-session",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "platform": "web"
+    }
+  }
+}
