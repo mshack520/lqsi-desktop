@@ -79,3 +79,18 @@ jobs:
             dist/versions.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 写更新策略 policy.json 并提交（放在 Release 之后，保证下载地址已存在）
+        shell: bash
+        run: |
+          node -e "const fs=require('fs');const v=process.argv[1];fs.mkdirSync('updates',{recursive:true});const p={updateAvailable:true,version:v,feedUrl:'https://github.com/'+process.env.LQSI_REPO+'/releases/download/v'+v+'/'};fs.writeFileSync('updates/policy.json',JSON.stringify(p,null,2)+'\n')" "${{ inputs.version }}"
+          cat updates/policy.json
+          git config user.name "lqsi-release-bot"
+          git config user.email "lqsi-bot@users.noreply.github.com"
+          git add updates/policy.json
+          if git diff --cached --quiet; then
+            echo "policy.json 无变化"
+          else
+            git commit -m "chore(update): point rollout to v${{ inputs.version }}"
+            git push origin HEAD:main
+          fi
