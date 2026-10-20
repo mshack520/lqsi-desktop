@@ -28,47 +28,38 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
 /* ── 1 安装器：盘符根目录自动补目录名 ─────────────────────────────────── */
 {
   const rel = 'build/installer.nsh'
-  let text = read(rel)
-  if (text.includes('DshNormalizeDriveRootFinal')) {
+  const text = read(rel)
+  if (text.includes('LQSI_ROOT_FIX')) {
     log(`${rel} 已包含盘符修复`)
   } else {
-    const fnStart = text.indexOf('Function DshNormalizeDriveRoot')
-    if (fnStart < 0) fail(`${rel} 找不到 DshNormalizeDriveRoot`)
-    const fnEnd = text.indexOf('FunctionEnd', fnStart)
-    if (fnEnd < 0) fail(`${rel} DshNormalizeDriveRoot 缺少 FunctionEnd`)
-    const insertAt = text.indexOf(String.fromCharCode(10), fnEnd + 'FunctionEnd'.length) + 1
-    const extra = `
-    ; LQSI_ROOT_FIX: 点“安装”时再兜一次（编辑框 OnChange 不一定触发），
-    ; 把 "F:" / "F:\\" 规范成 "F:\LQ SI" 并确保目录存在。
-    !ifndef MUI_PAGE_CUSTOMFUNCTION_LEAVE
-      !define MUI_PAGE_CUSTOMFUNCTION_LEAVE DshEnsureInstDirExists
-    !endif
-
-    Function DshEnsureInstDirExists
-      Call DshNormalizeDriveRootFinal
-      CreateDirectory "$INSTDIR"
-    FunctionEnd
-
-    Function DshNormalizeDriveRootFinal
-      StrCpy $0 $INSTDIR
-      StrLen $1 $0
-      \${If} $1 == 2
-        StrCpy $2 $0 1 1
-        \${If} $2 == ":"
-          StrCpy $INSTDIR "$0\LQ SI"
-        \${EndIf}
-      \${ElseIf} $1 == 3
-        StrCpy $2 $0 1 1
-        StrCpy $3 $0 1 2
-        \${If} $2 == ":"
-        \${AndIf} $3 == "\\"
-          StrCpy $INSTDIR "$0LQ SI"
-        \${EndIf}
-      \${EndIf}
-    FunctionEnd
-`
-    text = `${text.slice(0, insertAt)}${extra}${text.slice(insertAt)}`
-    write(rel, text)
+    const anchor = 'Function DshEnsureInstDirExists'
+    const start = text.indexOf(anchor)
+    if (start < 0) fail(`${rel} 找不到 DshEnsureInstDirExists`)
+    const end = text.indexOf('FunctionEnd', start)
+    if (end < 0) fail(`${rel} DshEnsureInstDirExists 缺少 FunctionEnd`)
+    const BS = String.fromCharCode(92)
+    const body = [
+      '; LQSI_ROOT_FIX: 选盘符根目录（F: 或 F:/ ）时自动补成 F:/LQ SI，并创建目录。',
+      'Function DshEnsureInstDirExists',
+      '  StrCpy $0 $INSTDIR',
+      '  StrLen $1 $0',
+      '  ${If} $1 == 2',
+      '    StrCpy $2 $0 1 1',
+      '    ${If} $2 == ":"',
+      '      StrCpy $INSTDIR "$0' + BS + 'LQ SI"',
+      '    ${EndIf}',
+      '  ${ElseIf} $1 == 3',
+      '    StrCpy $2 $0 1 1',
+      '    StrCpy $3 $0 1 2',
+      '    ${If} $2 == ":"',
+      '    ${AndIf} $3 == "' + BS + '"',
+      '      StrCpy $INSTDIR "$0LQ SI"',
+      '    ${EndIf}',
+      '  ${EndIf}',
+      '  CreateDirectory "$INSTDIR"',
+      'FunctionEnd'
+    ].join('\n')
+    write(rel, `${text.slice(0, start)}${body}${text.slice(end + 'FunctionEnd'.length)}`)
     log(`${rel} 已加入盘符根目录自动补名`)
   }
 }
@@ -135,20 +126,32 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
   if (!existsSync(join(repo, rel))) {
     log(`${rel} 不存在，跳过 provider 清理`)
   } else {
-  let text = read(rel)
-  if (!text.includes('LQ SI: DeepSeek 官方标准端点')) {
-    log(`${rel} 已无重复 provider 段`)
-  } else {
-    const start = text.indexOf('# LQ SI: DeepSeek 官方标准端点')
-    if (start < 0) fail(`${rel} 段定位失败`)
-    // 段尾：下一个顶层 "- id:" 或文件末尾
-    const rest = text.slice(start)
-    const nextRow = rest.search(/\n- id: /u)
-    const end = nextRow < 0 ? text.length : start + nextRow + 1
-    text = `${text.slice(0, start)}${text.slice(end)}`
-    write(rel, text)
-    log(`${rel} 已移除重复 DeepSeek 条目`)
-  }
+    let text = read(rel)
+    let removed = 0
+    for (let guard = 0; guard < 6; guard += 1) {
+      const marker = removed === 0 ? '- id: llm-pi-ai' : '- id: agent-default-model'
+      const row = text.indexOf(marker)
+      if (row < 0) break
+      // 往前吃掉紧邻的注释行
+      let begin = text.lastIndexOf(String.fromCharCode(10), row - 1) + 1
+      for (let step = 0; step < 6; step += 1) {
+        const prevStart = text.lastIndexOf(String.fromCharCode(10), begin - 2) + 1
+        const line = text.slice(prevStart, begin).trim()
+        if (line.startsWith('#')) begin = prevStart
+        else break
+      }
+      const NL = String.fromCharCode(10)
+      const next = text.indexOf(`${NL}- id: `, row + marker.length)
+      const stop = next < 0 ? text.length : next + 1
+      text = `${text.slice(0, begin)}${text.slice(stop)}`
+      removed += 1
+    }
+    if (removed > 0) {
+      write(rel, text)
+      log(`${rel} 已移除 ${removed} 段重复 DeepSeek 条目`)
+    } else {
+      log(`${rel} 已无重复 provider 段`)
+    }
   }
 }
 
