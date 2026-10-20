@@ -55,10 +55,6 @@ const readPattern = (re) => entries.map((e, i) => (re.test(e) ? i : -1)).filter(
   }
 }).join(String.fromCharCode(10))
 
-const outEntries = entries.filter((e) => e.startsWith('/out'))
-lines.push('INFO  /out 条目数  ' + outEntries.length + '  ' + outEntries.slice(0, 6).join(' | '))
-lines.push('INFO  preload 条目  ' + entries.filter((e) => e.includes('/preload/')).slice(0, 6).join(' | '))
-for (const line of lines.slice(-2)) console.log(line)
 
 // 1) 启动舞台与设置窗口的编译产物
 record(has('/out/preload/startup-gate.cjs'), '含启动舞台 preload')
@@ -67,7 +63,7 @@ record(entries.some((e) => e.includes('/out/main/startup-settings')), '含设置
 record(entries.some((e) => e.includes('/out/main/enterprise-view')), '含企业网页视图代码')
 
 // 2) 主进程关键接线
-const mainIndex = readPattern(/\/out\/main\/index[^/]*\.js$/)
+const mainIndex = readPattern(/^\/out\/main\/[^/]+\.js$/)
 record(mainIndex.includes('lqsi://settings'), '主进程接管 lqsi://settings（设置入口）')
 record(mainIndex.includes('lqsi:startup:'), '主进程注册启动舞台 IPC')
 record(mainIndex.includes('启动动画设置'), '菜单含「启动动画设置」')
