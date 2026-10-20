@@ -167,6 +167,70 @@ function replaceShowSplash(rel) {
 
 replaceShowSplash('src/main/index.ts')
 
+/* ── 启动覆盖层保持到工作区真正渲染 ───────────────────────────────────── */
+function ensureStartupOverlayHandoff(rel) {
+  let text = read(rel)
+  const eol = text.includes('\r\n') ? '\r\n' : '\n'
+  const helperMarker = 'LQSI_STARTUP_OVERLAY_HANDOFF_V1'
+  if (!text.includes(helperMarker)) {
+    const anchor = 'async function maybeImportWebHome('
+    if (!text.includes(anchor)) fail(`${rel} 找不到启动覆盖层函数插入点`)
+    const helper = [
+      'async function finishStartupOverlay(): Promise<void> {',
+      `  // ${helperMarker}`,
+      "  const startupStage = await import('./startup-stage')",
+      '  startupStage.finishStartupStage()',
+      '}',
+      ''
+    ].join(eol)
+    text = text.replace(anchor, `${helper}${anchor}`)
+  }
+
+  const healthStart = text.indexOf("ipcMain.handle('harness:renderer-healthy'")
+  if (healthStart < 0) fail(`${rel} 找不到工作区渲染就绪处理器`)
+  text = text.replace(
+    "ipcMain.handle('harness:renderer-healthy', (event) => {",
+    "ipcMain.handle('harness:renderer-healthy', async (event) => {"
+  )
+  const healthSchedule = text.indexOf('    scheduleNormalProfileBootConfirmation()', healthStart)
+  if (healthSchedule < 0) fail(`${rel} 找不到工作区渲染就绪处理器的成功出口`)
+  if (!text.slice(healthStart, healthSchedule).includes('LQSI_STARTUP_OVERLAY_HEALTH_READY')) {
+    text = `${text.slice(0, healthSchedule)}    // LQSI_STARTUP_OVERLAY_HEALTH_READY${eol}    await finishStartupOverlay()${eol}${text.slice(healthSchedule)}`
+  }
+
+  const recoveryStart = text.indexOf("ipcMain.handle('harness:open-recovery'")
+  const recoveryAssert = text.indexOf('    assertTrustedMainWindowEvent(event)', recoveryStart)
+  if (recoveryStart < 0 || recoveryAssert < 0) fail(`${rel} 找不到工作区故障恢复处理器`)
+  const recoveryLineEnd = text.indexOf(eol, recoveryAssert)
+  if (recoveryLineEnd < 0) fail(`${rel} 工作区故障恢复处理器格式异常`)
+  if (!text.slice(recoveryLineEnd, recoveryLineEnd + 160).includes('LQSI_STARTUP_OVERLAY_RECOVERY_READY')) {
+    const insertAt = recoveryLineEnd + eol.length
+    text = `${text.slice(0, insertAt)}    // LQSI_STARTUP_OVERLAY_RECOVERY_READY${eol}    await finishStartupOverlay()${eol}${text.slice(insertAt)}`
+  }
+
+  if (!text.includes('LQSI_STARTUP_OVERLAY_FAILURE_READY')) {
+    const failureBranch = /      } else if \(snapshot\.phase === 'failed'\) \{\r?\n        void showRuntimeFailure\(snapshot\)\r?\n      }/
+    if (!failureBranch.test(text)) fail(`${rel} 找不到启动失败时的覆盖层退出位置`)
+    text = text.replace(failureBranch, [
+      "      } else if (snapshot.phase === 'failed') {",
+      '        // LQSI_STARTUP_OVERLAY_FAILURE_READY',
+      '        void finishStartupOverlay()',
+      '          .catch((error) => {',
+      '            runtime.note(`[desktop] unable to close startup overlay after launch failure: ${',
+      '              error instanceof Error ? error.message : String(error)',
+      '            }`)',
+      '          })',
+      '          .finally(() => showRuntimeFailure(snapshot))',
+      '      }'
+    ].join(eol))
+  }
+
+  write(rel, text)
+  log(`${rel} 启动覆盖层保持到工作区渲染完成`)
+}
+
+ensureStartupOverlayHandoff('src/main/index.ts')
+
 /* ── 6 启动时注册 IPC ───────────────────────────────────────────────────── */
 {
   const rel = 'src/main/index.ts'

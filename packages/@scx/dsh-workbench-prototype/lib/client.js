@@ -12,6 +12,8 @@ exports.inject = void 0;
 exports.parseEnterpriseProfileConfig = parseEnterpriseProfileConfig;
 exports.appendApiOperationJson = appendApiOperationJson;
 exports.getSiteProxyPath = getSiteProxyPath;
+exports.shouldAttachEnterpriseWebsite = shouldAttachEnterpriseWebsite;
+exports.isWorkbenchPanelActive = isWorkbenchPanelActive;
 exports.apply = apply;
 const react_1 = __importDefault(require("react"));
 const R = react_1.default;
@@ -20,6 +22,7 @@ const h = R.createElement;
 exports.inject = ['desktopWorkbenches', 'configForms', 'locale', 'sessions'];
 const NS = 'scx.erpMesWorkbench';
 const zh = {
+    overviewTab: '业务总览', websiteTab: '企业网页', overviewEyebrow: '统一业务工作台', overviewTitle: '让企业数据与 AI 协作', overviewDescription: '从 ERP、MES 到库存、客户与协同系统，按企业授权连接数据，再用自然语言查询和整理结果。', overviewConnectionTitle: '当前连接', overviewConfigured: '系统地址已保存', overviewNotConfigured: '尚未配置企业系统', overviewUrlHelp: '可继续使用原有企业网页登录方式；官方只读 API 或数据库连接可在连接设置中配置。', overviewOpenWebsite: '打开企业网页', overviewConfigure: '连接设置', overviewMethodsTitle: '灵活接入方式', overviewMethodsHelp: '不同企业系统能力不同，按官方支持方式接入。网页连接会沿用原有登录与会话。', methodWebsite: '企业网页', methodWebsiteHelp: '嵌入原系统页面，沿用员工网页登录权限。', methodApi: '官方只读 API', methodApiHelp: '按官方接口文档配置查询操作，适合结构化数据。', methodDatabase: '只读数据库', methodDatabaseHelp: '使用专用只读账号查看获准的表结构与样例。', methodMcp: 'MCP / 系统连接器', methodMcpHelp: '预留扩展方式；此版本只保存 MCP 地址草稿，尚未建立连接。', overviewSystemsTitle: '常见企业系统类型', overviewSystemsHelp: '这里列出常见系统场景；能否读取数据取决于系统开放接口和企业授权。', overviewErp: '企业资源计划', overviewMes: '制造执行', overviewWms: '仓储管理', overviewCrm: '客户关系', overviewOa: '办公协同', overviewNoMetrics: '当前没有真实业务数据接入。本页先展示工作台布局；连接系统并验证接口后，再依据实际查询结果呈现指标。',
     panel: '业务工作台', settings: '连接设置', back: '返回网站', openChat: '打开 DSH 对话', badge: 'AI 业务工作台',
     chatStartHint: '点击下方快捷按钮即可开始与 AI 对话。', promptSending: '正在发送…', promptSent: '已发送到 AI 对话', promptSendFailed: '发送失败：请确认工作台会话和模型已就绪。',
     shipmentEntry: '登记发货', readCurrentPage: '读当前页',
@@ -39,8 +42,8 @@ const zh = {
     browserOnly: '已仅保存到当前浏览器，未写入 DSH profile。', sqlTitle: '只读 SQL 连接',
     mesAccountTitle: 'AI 业务连接账号', mesAccountHelp: 'AI 查询和发货通过 MES 固定接口执行，并按此账号的权限记录操作人。账号密码保存在 DSH 安全凭据中；会话过期后自动重新登录。',
     mesBaseUrl: 'MES 系统地址', mesUsername: 'MES 登录账号', mesPassword: 'MES 登录密码', mesPasswordHint: '保存后密码不会再次显示。修改或重新验证连接时需要重新输入。',
-    mesPageLoginHint: '上方网站页面的网页登录状态与 AI 接口账号分开；网页在 DSH 内首次登录后会记住会话，直到 MES 会话过期或被注销。',
-    mesNotConfigured: '尚未连接 AI 业务接口', mesConfigured: 'AI 业务接口已保存', mesSaving: '正在验证并保存…', mesSave: '验证并保存账号', mesSaved: 'MES 连接成功', mesLogout: '注销账号', mesLoggingOut: '正在注销…', mesLoggedOut: '账号和网页登录状态已清除。', mesLogoutFailed: '注销失败，请重试。', mesLoadFailed: '无法读取 MES 连接设置。', mesSaveFailed: 'MES 登录或连接失败。', mesPasswordRequired: '请输入 MES 登录密码后再保存。', mesReadOnly: 'DSH 安全凭据当前不可写。',
+    mesPageLoginHint: '保存 MES 账号后，返回网站会自动登录；注销账号会清除网页登录状态并返回未登录页面。',
+    mesNotConfigured: '尚未连接 AI 业务接口', mesConfigured: 'AI 业务接口已保存', mesSaving: '正在验证并保存…', mesSave: '验证并保存账号', mesSaved: 'MES 连接成功', mesLogout: '注销账号', mesLoggingOut: '正在注销…', mesLoggedOut: '账号已注销，网站已退出登录。', mesLogoutFailed: '注销失败，请重试。', mesLoadFailed: '无法读取 MES 连接设置。', mesSaveFailed: 'MES 登录或连接失败。', mesPasswordRequired: '请输入 MES 登录密码后再保存。', mesReadOnly: 'DSH 安全凭据当前不可写。',
     mesAutoLoginSaveFailed: 'MES 账号已保存，但自动登录凭据未能安全保存，请重试。',
     runtimeSyncFailed: '当前 DSH 服务未同步，网址暂时无法打开；请刷新后重试。',
     sqlHelp: '填写企业数据库连接信息后，DSH 会自动读取此 SQL 账号可见的表和字段。这里要填数据库服务器地址和 SQL 端口，不是 MES 网页地址或网页端口（例如 8063）。密码只保存在本次 DSH 运行的内存中，关闭并重开 DSH 后需要重新输入。请使用数据库管理员创建的只读账号。此连接按 SQL 账号权限读取，尚不会自动继承 ERP 网页员工角色。',
@@ -57,6 +60,7 @@ const zh = {
     mcpInvalid: 'MCP 地址需为有效的 http:// 或 https:// URL。', mcpFailed: '无法保存 MCP 地址草稿。', summary: '企业系统网址与连接设置',
 };
 const en = {
+    overviewTab: 'Overview', websiteTab: 'Enterprise website', overviewEyebrow: 'ENTERPRISE WORKSPACE', overviewTitle: 'Bring enterprise data and AI together', overviewDescription: 'Connect ERP, MES, inventory, customer, and collaboration systems through their supported, authorized interfaces, then ask questions in natural language.', overviewConnectionTitle: 'Current connection', overviewConfigured: 'System address saved', overviewNotConfigured: 'No enterprise system configured', overviewUrlHelp: 'Keep using the existing enterprise website sign-in. Configure official read-only APIs or a database in Connection settings.', overviewOpenWebsite: 'Open enterprise website', overviewConfigure: 'Connection settings', overviewMethodsTitle: 'Flexible connection methods', overviewMethodsHelp: 'Systems differ; use their supported integration method. Website connections keep the existing employee sign-in and session.', methodWebsite: 'Enterprise website', methodWebsiteHelp: 'Embed the existing system and use its employee access.', methodApi: 'Official read-only API', methodApiHelp: 'Configure documented query operations for structured data.', methodDatabase: 'Read-only database', methodDatabaseHelp: 'Use a dedicated read-only account for approved schema and samples.', methodMcp: 'MCP / system connector', methodMcpHelp: 'Reserved for future connectors; this version only saves an MCP URL draft and does not connect.', overviewSystemsTitle: 'Common enterprise system types', overviewSystemsHelp: 'These are common system categories. Data access depends on available interfaces and company authorization.', overviewErp: 'Enterprise resource planning', overviewMes: 'Manufacturing execution', overviewWms: 'Warehouse management', overviewCrm: 'Customer relationship', overviewOa: 'Office collaboration', overviewNoMetrics: 'No live business data is connected yet. This page previews the workspace layout; metrics can be shown after a system connection and its interface are verified.',
     panel: 'Business Workbench', settings: 'Connection settings', back: 'Back to system', openChat: 'Open DSH chat', badge: 'AI Workbench',
     chatStartHint: 'Choose a shortcut below to start chatting with AI.', promptSending: 'Sending…', promptSent: 'Sent to the AI conversation', promptSendFailed: 'Could not send. Check that the workbench session and model are ready.',
     shipmentEntry: 'Record shipment', readCurrentPage: 'Read current page',
@@ -76,8 +80,8 @@ const en = {
     browserOnly: 'Saved in this browser only; it was not written to the DSH profile.', sqlTitle: 'Read-only SQL connection',
     mesAccountTitle: 'AI business account', mesAccountHelp: 'AI queries and shipment entries use fixed MES APIs and this account’s permissions. Credentials are stored in DSH secure credentials; expired sessions are renewed automatically.',
     mesBaseUrl: 'MES system address', mesUsername: 'MES account', mesPassword: 'MES password', mesPasswordHint: 'The password is not shown after saving. Enter it again to change or revalidate the connection.',
-    mesPageLoginHint: 'The embedded website login and AI API account are separate. After signing in to the site once inside DSH, its browser session is remembered until MES expires or revokes it.',
-    mesNotConfigured: 'AI business API is not connected', mesConfigured: 'AI business API credentials are saved', mesSaving: 'Validating and saving…', mesSave: 'Validate and save account', mesSaved: 'MES connected', mesLogout: 'Log out account', mesLoggingOut: 'Logging out…', mesLoggedOut: 'Account and website login state cleared.', mesLogoutFailed: 'Could not log out. Please retry.', mesLoadFailed: 'Could not load MES connection settings.', mesSaveFailed: 'MES login or connection failed.', mesPasswordRequired: 'Enter the MES password before saving.', mesReadOnly: 'DSH secure credentials are read-only.',
+    mesPageLoginHint: 'After saving the MES account, returning to the website signs in automatically. Logging out clears the website session and returns to the signed-out page.',
+    mesNotConfigured: 'AI business API is not connected', mesConfigured: 'AI business API credentials are saved', mesSaving: 'Validating and saving…', mesSave: 'Validate and save account', mesSaved: 'MES connected', mesLogout: 'Log out account', mesLoggingOut: 'Logging out…', mesLoggedOut: 'Account logged out and website session cleared.', mesLogoutFailed: 'Could not log out. Please retry.', mesLoadFailed: 'Could not load MES connection settings.', mesSaveFailed: 'MES login or connection failed.', mesPasswordRequired: 'Enter the MES password before saving.', mesReadOnly: 'DSH secure credentials are read-only.',
     mesAutoLoginSaveFailed: 'MES account was saved, but auto-login credentials could not be stored securely. Please retry.',
     runtimeSyncFailed: 'The current DSH service did not sync the address. Reload and try again.',
     sqlHelp: 'Enter the database connection details and DSH will read tables and columns visible to this SQL account. Enter the database server host and SQL port, not the MES website URL or its web port (for example, 8063). The password stays in memory for this DSH run; enter it again after restarting DSH. Use a read-only database account. This connection follows SQL account permissions and does not yet inherit the ERP web employee role.',
@@ -122,6 +126,35 @@ const CSS = `
 .scxwb-status.warning{color:var(--dsw-alias-state-business-primary)}
 .scxwb-note{box-sizing:border-box;flex:none;padding:6px 14px;border-bottom:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .scxwb-toolbar{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:42px;padding:5px 10px;border-bottom:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1)}
+.scxwb-view-tabs{display:flex;align-items:center;gap:4px;min-width:0}
+.scxwb-view-tab{min-height:34px;padding:7px 12px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;font-weight:650;cursor:pointer}
+.scxwb-view-tab[aria-selected="true"]{border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+.scxwb-view-tab:focus-visible,.scxwb-overview button:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}
+.scxwb-overview{box-sizing:border-box;flex:1;min-height:0;overflow:auto;padding:clamp(14px,2.4vw,28px);background:var(--dsw-alias-bg-base)}
+.scxwb-web-column>[role="tabpanel"]{display:flex;flex:1;min-height:0;flex-direction:column}
+.scxwb-overview-inner{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.scxwb-overview-hero{position:relative;overflow:hidden;padding:clamp(20px,3vw,34px);border:1px solid var(--dsw-alias-border-l2);border-radius:18px;background:var(--dsw-alias-bg-layer-1)}
+.scxwb-overview-eyebrow{margin:0 0 9px;color:var(--dsw-alias-state-business-primary);font-size:11px;font-weight:750;letter-spacing:.12em}
+.scxwb-overview-title{max-width:680px;margin:0;color:var(--dsw-alias-label-primary);font-size:clamp(22px,3vw,34px);line-height:1.2;letter-spacing:-.025em}
+.scxwb-overview-description{max-width:720px;margin:12px 0 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.7}
+.scxwb-overview-section{display:flex;flex-direction:column;gap:11px}
+.scxwb-overview-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.scxwb-overview-section-head h3{margin:0;font-size:14px}
+.scxwb-overview-section-head p{margin:0;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:1.5}
+.scxwb-overview-connection{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px;border:1px solid var(--dsw-alias-border-l2);border-radius:13px;background:var(--dsw-alias-bg-layer-1)}
+.scxwb-overview-connection-copy{min-width:0}
+.scxwb-overview-connection-title{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;font-weight:700}
+.scxwb-overview-connection-meta{margin:6px 0 0;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.scxwb-overview-actions{display:flex;flex:none;flex-wrap:wrap;gap:7px}
+.scxwb-overview button{min-height:34px;padding:7px 11px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:11px;font-weight:650;cursor:pointer}
+.scxwb-overview button.primary{border-color:transparent;background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}
+.scxwb-overview button.primary:hover{background:var(--dsw-alias-button-primary-hover,var(--dsw-alias-button-primary-fill))}
+.scxwb-overview button:hover{background:var(--dsw-alias-bg-layer-2)}
+.scxwb-overview-methods,.scxwb-overview-systems{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.scxwb-overview-method,.scxwb-overview-system{min-width:0;padding:13px;border:1px solid var(--dsw-alias-border-l2);border-radius:11px;background:var(--dsw-alias-bg-layer-1)}
+.scxwb-overview-method h4,.scxwb-overview-system h4{margin:0;font-size:12px;font-weight:700}
+.scxwb-overview-method p,.scxwb-overview-system p{margin:5px 0 0;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:1.55}
+.scxwb-overview-no-metrics{padding:14px;border:1px dashed var(--dsw-alias-border-l2);border-radius:11px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:1.55}
 .scxwb-web-status{display:flex;align-items:center;gap:7px;min-width:0;color:var(--dsw-alias-label-secondary);font-size:12px;white-space:nowrap}
 .scxwb-status-dot{width:8px;height:8px;flex:none;border-radius:50%;background:#98a2b3}.scxwb-status-dot.ready{background:#21a675}.scxwb-status-dot.loading{background:#e5a22c;animation:scxwb-pulse 1s ease-in-out infinite alternate}.scxwb-status-dot.error{background:#d94b4b}
 .scxwb-toolbar-actions{display:flex;align-items:center;gap:6px;flex:none}
@@ -165,6 +198,7 @@ const CSS = `
 .scxwb-credential-status{margin-top:8px;color:var(--dsw-alias-label-secondary);font-size:12px}
 .scxwb-summary{padding:8px 0;color:var(--dsw-alias-label-secondary);font-size:14px}
 @container scxwb (max-width:760px){.scxwb-workspace{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:minmax(220px,1fr) minmax(260px,44%)}.scxwb-divider{display:none}.scxwb-web-column{border-right:0;border-bottom:1px solid var(--dsw-alias-border-l2)}.scxwb-assistant{border-left:0;border-top:1px solid var(--dsw-alias-border-l2)}.scxwb-shortcuts{gap:6px;padding:7px}.scxwb-shortcut{min-height:31px;padding:5px 8px}}
+@container scxwb (max-width:620px){.scxwb-overview-methods,.scxwb-overview-systems{grid-template-columns:1fr}.scxwb-overview-connection{align-items:flex-start;flex-direction:column}.scxwb-overview-section-head{align-items:flex-start;flex-direction:column}}
 @media(max-width:600px){.scxwb-top{padding:8px 10px;gap:8px}.scxwb-subtitle,.scxwb-badge{display:none}.scxwb-button{padding:8px 9px}.scxwb-grid{grid-template-columns:1fr}.scxwb-param-row{grid-template-columns:1fr 1fr}.scxwb-settings-wrap{padding:10px}}
 `;
 function insertStyles(css) {
@@ -172,6 +206,16 @@ function insertStyles(css) {
     style.textContent = css;
     document.head.appendChild(style);
     return () => style.remove();
+}
+function shouldAttachEnterpriseWebsite({ view, showSettings, hasFrame, panelActive, hasUrl }) {
+    return view === 'website' && !showSettings && hasFrame && panelActive && hasUrl;
+}
+function isWorkbenchPanelActive({ explicitActive, entryId, activeId, marketOpen }) {
+    if (marketOpen === true)
+        return false;
+    if (typeof explicitActive === 'boolean')
+        return explicitActive;
+    return !!entryId && activeId === entryId;
 }
 function readLegacySiteUrl() {
     try {
@@ -446,7 +490,7 @@ function MesApiAccountCard(props) {
             const result = await response.json();
             if (!response.ok)
                 throw new Error(result.error || t('mesSaveFailed'));
-            const websiteCredentials = await window.dshDesktop?.saveEnterpriseWebsiteLoginCredentials?.(baseUrl, username, password);
+            const websiteCredentials = await (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()?.saveEnterpriseWebsiteLoginCredentials?.(props.websiteUrl || baseUrl, username, password);
             if (!websiteCredentials?.ok)
                 throw new Error(t('mesAutoLoginSaveFailed'));
             setSettings(result);
@@ -471,7 +515,7 @@ function MesApiAccountCard(props) {
         setStatus(t('mesLoggingOut'));
         setStatusKind('');
         try {
-            const website = await window.dshDesktop?.clearEnterpriseWebsiteLogin?.(baseUrl);
+            const website = await (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()?.clearEnterpriseWebsiteLogin?.(props.websiteUrl || baseUrl);
             if (!website?.ok)
                 throw new Error(t('mesLogoutFailed'));
             const response = await fetch(`${window.location.origin}/api/scx-mes-query.logout`, {
@@ -804,7 +848,7 @@ function SettingsForm(props) {
     };
     if (props.view === 'summary')
         return h('div', { className: 'scxwb-summary' }, t('summary'));
-    return h('div', { className: 'scxwb-settings' }, h('section', { className: 'scxwb-card' }, h('h3', null, t('systemCard')), h('label', { className: 'scxwb-field' }, t('websiteUrl'), h('input', { type: 'url', value: siteUrl, placeholder: 'https://mes.example.com/', onChange: (event) => setSiteUrl(event.currentTarget.value) })), h('label', { className: 'scxwb-field' }, t('systemName'), h('input', { type: 'text', value: systemName, maxLength: 50, placeholder: t('systemPlaceholder'), onChange: (event) => setSystemName(event.currentTarget.value) })), h('div', { className: 'scxwb-row' }, h('button', { className: 'scxwb-button', type: 'button', disabled: saving, onClick: saveSiteUrl }, saving ? t('saving') : t('saveSettings'))), h('h4', null, t('configFileTitle')), h('p', { className: 'scxwb-help' }, t('configFileHelp')), h('div', { className: 'scxwb-row' }, h('label', { className: 'scxwb-field' }, t('importConfig'), h('input', { type: 'file', accept: '.json,application/json', disabled: saving, onChange: (event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; void importCompanyConfig(file); } })), h('button', { className: 'scxwb-button secondary', type: 'button', disabled: saving, onClick: exportCompanyConfig }, t('exportConfig')))), h(MesApiAccountCard, { t }), h('section', { className: 'scxwb-card' }, h('h3', null, t('sqlTitle')), h('p', { className: 'scxwb-help' }, t('sqlHelp')), h('p', { className: 'scxwb-help', role: 'status' }, sqlConnected ? t('sqlStatusConnected') : t('sqlNotConnected')), h('div', { className: 'scxwb-grid' }, h('label', { className: 'scxwb-field' }, t('sqlDialect'), h('select', { value: sqlDialect, onChange: (event) => {
+    return h('div', { className: 'scxwb-settings' }, h('section', { className: 'scxwb-card' }, h('h3', null, t('systemCard')), h('label', { className: 'scxwb-field' }, t('websiteUrl'), h('input', { type: 'url', value: siteUrl, placeholder: 'https://mes.example.com/', onChange: (event) => setSiteUrl(event.currentTarget.value) })), h('label', { className: 'scxwb-field' }, t('systemName'), h('input', { type: 'text', value: systemName, maxLength: 50, placeholder: t('systemPlaceholder'), onChange: (event) => setSystemName(event.currentTarget.value) })), h('div', { className: 'scxwb-row' }, h('button', { className: 'scxwb-button', type: 'button', disabled: saving, onClick: saveSiteUrl }, saving ? t('saving') : t('saveSettings'))), h('h4', null, t('configFileTitle')), h('p', { className: 'scxwb-help' }, t('configFileHelp')), h('div', { className: 'scxwb-row' }, h('label', { className: 'scxwb-field' }, t('importConfig'), h('input', { type: 'file', accept: '.json,application/json', disabled: saving, onChange: (event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; void importCompanyConfig(file); } })), h('button', { className: 'scxwb-button secondary', type: 'button', disabled: saving, onClick: exportCompanyConfig }, t('exportConfig')))), h(MesApiAccountCard, { t, websiteUrl: siteUrl }), h('section', { className: 'scxwb-card' }, h('h3', null, t('sqlTitle')), h('p', { className: 'scxwb-help' }, t('sqlHelp')), h('p', { className: 'scxwb-help', role: 'status' }, sqlConnected ? t('sqlStatusConnected') : t('sqlNotConnected')), h('div', { className: 'scxwb-grid' }, h('label', { className: 'scxwb-field' }, t('sqlDialect'), h('select', { value: sqlDialect, onChange: (event) => {
             const next = event.currentTarget.value;
             setSqlDialect(next);
             if (sqlPort === '1433' || sqlPort === '3306' || sqlPort === '5432')
@@ -817,6 +861,7 @@ function DashboardPanel(props) {
     const [siteUrl, setSiteUrl] = R.useState(() => readConfiguredSiteUrl(siteForm?.getSnapshot()) || readLegacySiteUrl());
     const [systemName, setSystemName] = R.useState(() => readConfiguredSystemName(siteForm?.getSnapshot()) || readLegacySystemName());
     const [showSettings, setShowSettings] = R.useState(false);
+    const [activeView, setActiveView] = R.useState('overview');
     const [openStatus, setOpenStatus] = R.useState('');
     const [frameElement, setFrameElement] = R.useState(null);
     // Keep the callback ref stable: a fresh inline callback clears the old ref
@@ -830,7 +875,10 @@ function DashboardPanel(props) {
     const [dividerDrag, setDividerDrag] = R.useState(null);
     const workbenchService = props.service;
     const workbenchEntry = props.entry;
-    const panelActive = !!workbenchEntry?.id && workbenchService?.state?.active === workbenchEntry.id && workbenchService?.marketOpen !== true;
+    // The host passes `active` from the exact panel selection it rendered.
+    // Prefer it over the service snapshot, which can lag during navigation and
+    // otherwise leaves the native website view detached while this panel is visible.
+    const panelActive = isWorkbenchPanelActive({ explicitActive: props.active, entryId: workbenchEntry?.id, activeId: workbenchService?.state?.active, marketOpen: workbenchService?.marketOpen });
     const sessions = props.sessions;
     R.useEffect(() => {
         const layout = workbenchService?.ctx?.layout;
@@ -866,7 +914,7 @@ function DashboardPanel(props) {
     const normalizedSiteUrl = normalizeSiteUrl(siteUrl);
     const refreshWebsiteStatus = async () => {
         try {
-            const status = await window.dshDesktop?.getEnterpriseWebsiteStatus?.();
+            const status = await (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()?.getEnterpriseWebsiteStatus?.();
             if (status)
                 setWebsiteStatus(status);
         }
@@ -875,7 +923,7 @@ function DashboardPanel(props) {
     const reloadWebsite = async () => {
         setWebsiteStatus((previous) => ({ ...previous, loading: true, error: '' }));
         try {
-            const result = await window.dshDesktop?.reloadEnterpriseWebsite?.();
+            const result = await (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()?.reloadEnterpriseWebsite?.();
             if (!result?.ok)
                 throw new Error('reload unavailable');
             setOpenStatus('');
@@ -973,14 +1021,14 @@ function DashboardPanel(props) {
         }
     };
     R.useEffect(() => {
-        const desktop = window.dshDesktop;
+        const desktop = (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})();
         if (!desktop?.attachEnterpriseWebsite || !desktop.updateEnterpriseWebsiteBounds || !desktop.setEnterpriseWebsiteCovered || !desktop.closeEnterpriseWebsite || !normalizedSiteUrl) {
             if (desktop?.closeEnterpriseWebsite)
                 void desktop.closeEnterpriseWebsite();
             setWebsiteStatus({ ok: false, loading: false, url: '', title: '', error: '' });
             return;
         }
-        if (showSettings || !frameElement || !panelActive) {
+        if (!shouldAttachEnterpriseWebsite({ view: activeView, showSettings, hasFrame: !!frameElement, panelActive, hasUrl: !!normalizedSiteUrl })) {
             // WebContentsView is a native child view and always paints above the
             // renderer. Remove it when this panel is not the active surface so it
             // cannot sit over Harness settings, the plugin market, or another panel.
@@ -1087,17 +1135,23 @@ function DashboardPanel(props) {
             void refreshWebsiteStatus();
             statusTimer = window.setTimeout(pollWebsiteStatus, 1400);
         };
-        pollWebsiteStatus();
         void desktop.attachEnterpriseWebsite(normalizedSiteUrl, systemName, getBounds()).then((result) => {
             if (!active)
                 return;
-            if (!result.ok)
+            if (!result?.ok) {
+                setWebsiteStatus((previous) => ({ ...previous, ok: false, loading: false, error: t('openWebsiteFailed') }));
                 setOpenStatus(t('openWebsiteFailed'));
+                return;
+            }
+            setOpenStatus('');
             void refreshWebsiteStatus();
             updateCoverage();
+            pollWebsiteStatus();
         }).catch(() => {
-            if (active)
+            if (active) {
+                setWebsiteStatus((previous) => ({ ...previous, ok: false, loading: false, error: t('openWebsiteFailed') }));
                 setOpenStatus(t('openWebsiteFailed'));
+            }
         });
         return () => {
             active = false;
@@ -1114,7 +1168,7 @@ function DashboardPanel(props) {
             window.removeEventListener('scroll', updateBounds, true);
             void desktop.closeEnterpriseWebsite?.();
         };
-    }, [normalizedSiteUrl, systemName, showSettings, frameElement, panelActive]);
+    }, [normalizedSiteUrl, systemName, showSettings, activeView, frameElement, panelActive]);
     const shortcuts = [
         { label: t('todayReport'), prompt: '查询今天的报工汇总，并按型号列出良品数量。' },
         { label: t('currentInventory'), prompt: '查询当前库存，按仓库和工序节点列出数量。' },
@@ -1127,27 +1181,54 @@ function DashboardPanel(props) {
     const conversationNode = props.conversation;
     const websiteStateClass = websiteStatus.error ? 'error' : websiteStatus.loading ? 'loading' : websiteStatus.ok ? 'ready' : '';
     const websiteStateLabel = websiteStatus.error ? `${t('webFailed')}：${websiteStatus.error}` : websiteStatus.loading ? t('webLoading') : websiteStatus.covered ? t('webCovered') : websiteStatus.ok ? t('webReady') : t('webIdle');
-    return h('section', { className: 'scxwb-root', 'data-scxwb-root': 'true', 'aria-label': `${systemName} ${t('panel')}` }, h('header', { className: 'scxwb-top' }, h('div', { className: 'scxwb-brand' }, h('div', { className: 'scxwb-mark', 'aria-hidden': 'true' }, 'LQ'), h('div', null, h('div', { className: 'scxwb-title' }, systemName))), h('div', { className: 'scxwb-actions' }, h('span', { className: 'scxwb-badge' }, t('badge')), h('button', { className: 'scxwb-button secondary', type: 'button', onClick: () => setShowSettings(!showSettings) }, showSettings ? t('back') : t('settings')))), showSettings
-        ? h('div', { className: 'scxwb-settings-wrap' }, h(SettingsForm, { t, configStore: siteForm, onSiteUrlSaved: setSiteUrl }))
-        : h(R.Fragment, null, h('div', { className: 'scxwb-workspace', style: { gridTemplateColumns: `minmax(0, ${webColumnWidth}%) 7px minmax(340px, 1fr)` } }, h('div', { className: 'scxwb-web-column' }, h('div', { className: 'scxwb-toolbar' }, h('div', { className: 'scxwb-web-status', role: 'status', 'aria-live': 'polite' }, h('span', { className: `scxwb-status-dot ${websiteStateClass}`, 'aria-hidden': 'true' }), h('span', null, `${t('webStatus')}：${websiteStateLabel}`)), h('div', { className: 'scxwb-toolbar-actions' }, h('button', { type: 'button', onClick: reloadWebsite, disabled: !normalizedSiteUrl }, t('reload')))), h('div', { className: 'scxwb-frame-wrap', ref: frameRef }, !normalizedSiteUrl
-            ? h('div', { className: 'scxwb-frame-empty' }, t(siteUrl ? 'invalidUrl' : 'noUrl'))
-            : !window.dshDesktop?.attachEnterpriseWebsite
-                ? h('div', { className: 'scxwb-frame-empty' }, t('embeddedUnavailable'))
-                : websiteStatus.error
-                    ? h('div', { className: 'scxwb-frame-empty', role: 'alert', 'aria-live': 'assertive' }, `${t('webFailed')}：${websiteStatus.error}`)
-                    : websiteStatus.loading
-                        ? h('div', { className: 'scxwb-frame-empty', role: 'status', 'aria-live': 'polite' }, `${systemName} ${t('webLoading')}…`)
-                        : openStatus
-                            ? h('div', { className: 'scxwb-frame-empty', role: 'alert', 'aria-live': 'assertive' }, openStatus)
-                            : null)), h('div', {
-            className: 'scxwb-divider', role: 'separator', tabIndex: 0, 'aria-orientation': 'vertical',
-            'aria-label': '调整网页和对话区域宽度', 'aria-valuemin': 40, 'aria-valuemax': 76, 'aria-valuenow': Math.round(webColumnWidth),
-            'data-dragging': dividerDrag ? 'true' : 'false',
-            onPointerDown: startDividerDrag, onPointerMove: moveDivider, onPointerUp: finishDividerDrag, onPointerCancel: finishDividerDrag,
-            onKeyDown: adjustDivider,
-        }), h('aside', { className: 'scxwb-assistant', 'aria-label': 'AI 对话与快捷按钮' }, h('div', { className: 'scxwb-chat' }, conversationBound && conversationNode
-            ? conversationNode
-            : h('div', { className: 'scxwb-chat-empty' }, t('chatStartHint'))), aiActionStatus ? h('div', { className: `scxwb-ai-status${aiActionStatus.startsWith(t('promptSendFailed')) ? ' error' : ''}`, role: 'status', 'aria-live': 'polite' }, aiActionStatus) : null, h('div', { className: 'scxwb-shortcuts', 'aria-label': '快捷操作' }, ...shortcuts.map((item) => h('button', { key: item.label, className: 'scxwb-shortcut', type: 'button', disabled: sendingPrompt, onClick: () => void sendAiPrompt(item.prompt) }, item.label)))))));
+    const handleViewTabKeyDown = (event) => {
+        const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+        if (!keys.includes(event.key))
+            return;
+        const tabs = Array.from(event.currentTarget.querySelectorAll('[role="tab"]'));
+        const current = tabs.indexOf(event.target);
+        if (current < 0 || tabs.length === 0)
+            return;
+        event.preventDefault();
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        tabs[next]?.focus();
+        tabs[next]?.click();
+    };
+    return h('section', { className: 'scxwb-root', 'data-scxwb-root': 'true', 'aria-label': `${systemName} ${t('panel')}` },
+        h('header', { className: 'scxwb-top' }, h('div', { className: 'scxwb-brand' }, h('div', { className: 'scxwb-mark', 'aria-hidden': 'true' }, 'LQ'), h('div', null, h('div', { className: 'scxwb-title' }, systemName))), h('div', { className: 'scxwb-actions' }, h('span', { className: 'scxwb-badge' }, t('badge')), h('button', { className: 'scxwb-button secondary', type: 'button', onClick: () => setShowSettings(!showSettings) }, showSettings ? t('back') : t('settings')))),
+        showSettings
+            ? h('div', { className: 'scxwb-settings-wrap' }, h(SettingsForm, { t, configStore: siteForm, onSiteUrlSaved: setSiteUrl }))
+            : h('div', { className: 'scxwb-workspace', style: { gridTemplateColumns: `minmax(0, ${webColumnWidth}%) 7px minmax(340px, 1fr)` } },
+                h('div', { className: 'scxwb-web-column' },
+                    h('div', { className: 'scxwb-toolbar' },
+                        h('div', { className: 'scxwb-view-tabs', role: 'tablist', 'aria-label': t('panel'), onKeyDown: handleViewTabKeyDown },
+                            h('button', { id: 'scxwb-overview-tab', className: 'scxwb-view-tab', type: 'button', role: 'tab', 'aria-selected': activeView === 'overview', 'aria-controls': 'scxwb-overview-panel', tabIndex: activeView === 'overview' ? 0 : -1, onClick: () => setActiveView('overview') }, t('overviewTab')),
+                            h('button', { id: 'scxwb-website-tab', className: 'scxwb-view-tab', type: 'button', role: 'tab', 'aria-selected': activeView === 'website', 'aria-controls': 'scxwb-website-panel', tabIndex: activeView === 'website' ? 0 : -1, onClick: () => setActiveView('website') }, t('websiteTab'))),
+                        activeView === 'website' ? h(R.Fragment, null, h('div', { className: 'scxwb-web-status', role: 'status', 'aria-live': 'polite' }, h('span', { className: `scxwb-status-dot ${websiteStateClass}`, 'aria-hidden': 'true' }), h('span', null, `${t('webStatus')}：${websiteStateLabel}`)), h('div', { className: 'scxwb-toolbar-actions' }, h('button', { type: 'button', onClick: reloadWebsite, disabled: !normalizedSiteUrl }, t('reload')))) : null),
+                    activeView === 'overview'
+                        ? h('div', { id: 'scxwb-overview-panel', role: 'tabpanel', 'aria-labelledby': 'scxwb-overview-tab' }, h(OverviewPanel, { t, systemName, normalizedSiteUrl, onOpenWebsite: () => setActiveView('website'), onOpenSettings: () => setShowSettings(true) }))
+                        : h('div', { id: 'scxwb-website-panel', className: 'scxwb-frame-wrap', role: 'tabpanel', 'aria-labelledby': 'scxwb-website-tab', ref: frameRef }, !normalizedSiteUrl
+                            ? h('div', { className: 'scxwb-frame-empty' }, t(siteUrl ? 'invalidUrl' : 'noUrl'))
+                            : !(function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()?.attachEnterpriseWebsite
+                                ? h('div', { className: 'scxwb-frame-empty' }, t('embeddedUnavailable'))
+                                : websiteStatus.error
+                                    ? h('div', { className: 'scxwb-frame-empty', role: 'alert', 'aria-live': 'assertive' }, `${t('webFailed')}：${websiteStatus.error}`)
+                                    : websiteStatus.loading
+                                        ? h('div', { className: 'scxwb-frame-empty', role: 'status', 'aria-live': 'polite' }, `${systemName} ${t('webLoading')}…`)
+                                        : openStatus
+                                            ? h('div', { className: 'scxwb-frame-empty', role: 'alert', 'aria-live': 'assertive' }, openStatus)
+                                            : null),
+                    ),
+                h('div', {
+                    className: 'scxwb-divider', role: 'separator', tabIndex: 0, 'aria-orientation': 'vertical',
+                    'aria-label': '调整网页和对话区域宽度', 'aria-valuemin': 40, 'aria-valuemax': 76, 'aria-valuenow': Math.round(webColumnWidth),
+                    'data-dragging': dividerDrag ? 'true' : 'false',
+                    onPointerDown: startDividerDrag, onPointerMove: moveDivider, onPointerUp: finishDividerDrag, onPointerCancel: finishDividerDrag,
+                    onKeyDown: adjustDivider,
+                }),
+                h('aside', { className: 'scxwb-assistant', 'aria-label': 'AI 对话与快捷按钮' }, h('div', { className: 'scxwb-chat' }, conversationBound && conversationNode
+                    ? conversationNode
+                    : h('div', { className: 'scxwb-chat-empty' }, t('chatStartHint'))), aiActionStatus ? h('div', { className: `scxwb-ai-status${aiActionStatus.startsWith(t('promptSendFailed')) ? ' error' : ''}`, role: 'status', 'aria-live': 'polite' }, aiActionStatus) : null, h('div', { className: 'scxwb-shortcuts', 'aria-label': '快捷操作' }, ...shortcuts.map((item) => h('button', { key: item.label, className: 'scxwb-shortcut', type: 'button', disabled: sendingPrompt, onClick: () => void sendAiPrompt(item.prompt) }, item.label))))));
 }
 function activeSessionId(sessions) {
     try {
@@ -1157,6 +1238,23 @@ function activeSessionId(sessions) {
     catch {
         return undefined;
     }
+}
+function OverviewPanel({ t, systemName, normalizedSiteUrl, onOpenWebsite, onOpenSettings }) {
+    const methods = [
+        ['01', t('methodWebsite'), t('methodWebsiteHelp')],
+        ['02', t('methodApi'), t('methodApiHelp')],
+        ['03', t('methodDatabase'), t('methodDatabaseHelp')],
+        ['04', t('methodMcp'), t('methodMcpHelp')],
+    ];
+    const systems = [
+        ['ERP', t('overviewErp')], ['MES', t('overviewMes')], ['WMS', t('overviewWms')],
+        ['CRM', t('overviewCrm')], ['OA', t('overviewOa')],
+    ];
+    return h('div', { className: 'scxwb-overview', 'aria-label': t('overviewTab') }, h('div', { className: 'scxwb-overview-inner' },
+        h('section', { className: 'scxwb-overview-hero' }, h('p', { className: 'scxwb-overview-eyebrow' }, t('overviewEyebrow')), h('h2', { className: 'scxwb-overview-title' }, t('overviewTitle')), h('p', { className: 'scxwb-overview-description' }, t('overviewDescription'))),
+        h('section', { className: 'scxwb-overview-section', 'aria-labelledby': 'scxwb-connection-heading' }, h('div', { className: 'scxwb-overview-section-head' }, h('h3', { id: 'scxwb-connection-heading' }, t('overviewConnectionTitle'))), h('div', { className: 'scxwb-overview-connection' }, h('div', { className: 'scxwb-overview-connection-copy' }, h('p', { className: 'scxwb-overview-connection-title' }, systemName), h('p', { className: 'scxwb-overview-connection-meta', role: 'status', 'aria-live': 'polite' }, normalizedSiteUrl ? `${t('overviewConfigured')} · ${normalizedSiteUrl}` : t('overviewNotConfigured')), h('p', { className: 'scxwb-overview-connection-meta' }, t('overviewUrlHelp'))), h('div', { className: 'scxwb-overview-actions' }, h('button', { className: 'primary', type: 'button', onClick: onOpenWebsite }, t('overviewOpenWebsite')), h('button', { type: 'button', onClick: onOpenSettings }, t('overviewConfigure'))))),
+        h('section', { className: 'scxwb-overview-section', 'aria-labelledby': 'scxwb-methods-heading' }, h('div', { className: 'scxwb-overview-section-head' }, h('h3', { id: 'scxwb-methods-heading' }, t('overviewMethodsTitle')), h('p', null, t('overviewMethodsHelp'))), h('div', { className: 'scxwb-overview-methods' }, ...methods.map(([number, title, description]) => h('article', { className: 'scxwb-overview-method', key: number }, h('h4', null, `${number} · ${title}`), h('p', null, description))))),
+        h('section', { className: 'scxwb-overview-section', 'aria-labelledby': 'scxwb-systems-heading' }, h('div', { className: 'scxwb-overview-section-head' }, h('h3', { id: 'scxwb-systems-heading' }, t('overviewSystemsTitle')), h('p', null, t('overviewSystemsHelp'))), h('div', { className: 'scxwb-overview-systems' }, ...systems.map(([code, description]) => h('article', { className: 'scxwb-overview-system', key: code }, h('h4', null, code), h('p', null, description)))), h('div', { className: 'scxwb-overview-no-metrics', role: 'note' }, t('overviewNoMetrics')))));
 }
 function startApiBridge(ctx) {
     const sessions = ctx.get('sessions');
@@ -1206,12 +1304,12 @@ function startApiBridge(ctx) {
                 try {
                     const parameters = job.parameters && typeof job.parameters === 'object' ? job.parameters : {};
                     const data = job.path === EMPLOYEE_PERMISSION_PATH
-                        ? await window.dshDesktop?.readEnterpriseEmployeePermissions?.()
+                        ? await (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()?.readEnterpriseEmployeePermissions?.()
                         : job.path === PAGE_INSPECT_PATH
-                            ? await window.dshDesktop?.inspectEnterpriseWebsitePage?.()
+                            ? await (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()?.inspectEnterpriseWebsitePage?.()
                             : job.path === PAGE_ACTION_PATH
-                                ? await window.dshDesktop?.controlEnterpriseWebsitePage?.({ action: typeof parameters.action === 'string' ? parameters.action : '', ...(typeof parameters.target === 'string' ? { target: parameters.target } : {}), ...(typeof parameters.value === 'string' ? { value: parameters.value } : {}) })
-                                : await window.dshDesktop?.readEnterpriseWebsiteApi?.(job.path, parameters);
+                                ? await (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()?.controlEnterpriseWebsitePage?.({ action: typeof parameters.action === 'string' ? parameters.action : '', ...(typeof parameters.target === 'string' ? { target: parameters.target } : {}), ...(typeof parameters.value === 'string' ? { value: parameters.value } : {}) })
+                                : await (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()?.readEnterpriseWebsiteApi?.(job.path, parameters);
                     if (data === undefined)
                         throw new Error('桌面 ERP 安全连接未就绪，请重开工作台后重试');
                     await complete(sessionId, job.requestId, data, false);

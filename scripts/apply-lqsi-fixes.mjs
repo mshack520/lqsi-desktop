@@ -87,7 +87,7 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
     const pairs = [
       ["brandName: 'DSH Desktop'", "brandName: 'LQ SI'"],
       ["brandBy: 'by dataelem'", "brandBy: 'by LQ SI'"],
-      ["step0Title: '内测声明'", "step0Title: 'LQ SI 使用说明'"],
+      ["step0Title: '内测声明'", "step0Title: 'LQ SI 灵启智能体'"],
       ["desktopIntroTitle: '关于 DSH Desktop'", "desktopIntroTitle: '关于 LQ SI'"],
       [
         "officialSiteUrl: 'https://dshdesktop.com/zh/'",
@@ -127,6 +127,18 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
     write(rel, text)
     log(`${rel} 文案已改为 LQ SI（命中 ${hits} 处）`)
   }
+  }
+  // Keep the requested first-run title stable even when the rest of the
+  // branded onboarding copy is already present and the block above is skipped.
+  if (existsSync(join(repo, rel))) {
+    const current = read(rel)
+    const corrected = current
+      .replace("step0Title: '介绍 LQ SI 灵启智能体'", "step0Title: 'LQ SI 灵启智能体'")
+      .replace("step0Title: 'LQ SI 使用说明'", "step0Title: 'LQ SI 灵启智能体'")
+    if (corrected !== current) {
+      write(rel, corrected)
+      log(`${rel} 首启标题已去掉“介绍”`)
+    }
   }
 }
 
@@ -172,11 +184,11 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
     log(`${rel} 不存在，跳过设置页桥接`)
   } else {
     const text = read(rel)
-    if (text.includes('{LQSI_BRIDGE_FALLBACK}')) {
+    const fallback =
+      '(function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()'
+    if (text.includes(fallback)) {
       log(`${rel} 已含桥接兜底`)
     } else {
-      const fallback =
-        '(function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()'
       const next = text.split('window.dshDesktop').join(fallback)
       write(rel, next)
       log(`${rel} 已改为多窗口查找 dshDesktop`)
@@ -191,11 +203,11 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
     log(`${rel} 不存在，跳过工作台桥接`)
   } else {
     const text = read(rel)
-    if (text.includes('{LQSI_BRIDGE_FALLBACK}')) {
+    const fallback =
+      '(function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()'
+    if (text.includes(fallback)) {
       log(`${rel} 已含桥接兜底`)
     } else {
-      const fallback =
-        '(function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()'
       const next = text.split('window.dshDesktop').join(fallback)
       write(rel, next)
       log(`${rel} 已改为多窗口查找 dshDesktop`)
@@ -295,6 +307,35 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
         write(rel, text.replace(target, replacement))
         log(`${rel} 面板改为唤起独立设置窗口`)
       }
+    }
+  }
+}
+
+/* ── 8 托盘名称：统一为 LQ SI Desktop ────────────────────────────────── */
+{
+  const rel = 'src/main/index.ts'
+  if (!existsSync(join(repo, rel))) {
+    log(`${rel} 不存在，跳过托盘名称`)
+  } else {
+    let text = read(rel)
+    const pairs = [
+      ["tray.setToolTip('DSH Desktop')", "tray.setToolTip('LQ SI Desktop')"],
+      ["locale === 'zh' ? '显示 DSH Desktop' : 'Show DSH Desktop'", "locale === 'zh' ? '显示 LQ SI Desktop' : 'Show LQ SI Desktop'"]
+    ]
+    let changed = false
+    for (const [from, to] of pairs) {
+      if (text.includes(from)) {
+        text = text.replace(from, to)
+        changed = true
+      }
+    }
+    if (changed) {
+      write(rel, text)
+      log(`${rel} 托盘名称已改为 LQ SI Desktop`)
+    } else if (text.includes("tray.setToolTip('LQ SI Desktop')")) {
+      log(`${rel} 托盘名称已是 LQ SI Desktop`)
+    } else {
+      fail(`${rel} 找不到托盘名称锚点，拒绝静默跳过`)
     }
   }
 }

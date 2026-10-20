@@ -11,7 +11,9 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve('src/preload/index.ts')
+          index: resolve('src/preload/index.ts'),
+          'startup-gate': resolve('src/preload/startup-gate.ts'),
+          'startup-settings': resolve('src/preload/startup-settings.ts')
         },
         output: {
           format: 'cjs',

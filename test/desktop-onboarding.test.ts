@@ -216,10 +216,8 @@ describe('DSH Desktop onboarding wizard', () => {
     expect(source).toContain('openSection(MODELS_SECTION_ID)')
     expect(source).not.toContain('OnboardingSurface')
     expect(source).not.toContain('ModelsSection')
-    expect(source).toContain('https://github.com/dataelement/dsh-desktop\'')
+    expect(source).not.toContain('https://github.com/dataelement/dsh-desktop')
     expect(source).not.toContain('dsh-desktop/issues')
-    expect(source).toContain('GITHUB_MARK_PATH')
-    expect(source).toContain('IconGlobeOutlineRegular')
   })
 
   it('registers the desktop notice as the only onboarding step', () => {
@@ -297,7 +295,7 @@ describe('DSH Desktop onboarding wizard', () => {
     const zh = dictsRecord.zh ?? {}
     const en = dictsRecord.en ?? {}
     expect(Object.keys(zh).sort()).toEqual(Object.keys(en).sort())
-    expect(zh.step0Title).toBe('内测声明')
+    expect(zh.step0Title).toBe('LQ SI 灵启智能体')
     expect(zh.configureModel).toBe('去配置模型')
     expect(en.configureModel).toBeTruthy()
     expect(en.later).toBeTruthy()

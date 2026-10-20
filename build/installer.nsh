@@ -66,9 +66,25 @@
     ; without needing to pre-create parent folders first.
     !define MUI_PAGE_CUSTOMFUNCTION_LEAVE DshEnsureInstDirExists
 
-    Function DshEnsureInstDirExists
-      CreateDirectory "$INSTDIR"
-    FunctionEnd
+    ; LQSI_ROOT_FIX: 选盘符根目录（F: 或 F:/ ）时自动补成 F:/LQ SI，并创建目录。
+Function DshEnsureInstDirExists
+  StrCpy $0 $INSTDIR
+  StrLen $1 $0
+  ${If} $1 == 2
+    StrCpy $2 $0 1 1
+    ${If} $2 == ":"
+      StrCpy $INSTDIR "$0\LQ SI"
+    ${EndIf}
+  ${ElseIf} $1 == 3
+    StrCpy $2 $0 1 1
+    StrCpy $3 $0 1 2
+    ${If} $2 == ":"
+    ${AndIf} $3 == "\"
+      StrCpy $INSTDIR "$0LQ SI"
+    ${EndIf}
+  ${EndIf}
+  CreateDirectory "$INSTDIR"
+FunctionEnd
 
     ; Accept any directory path the user types, even if it does not exist yet.
     ; Without this override NSIS rejects non-existent paths before the user
@@ -76,8 +92,8 @@
     !macro preInit
     !macroend
     Function .onVerifyInstDir
-      ; Always pass — we create the directory in DshEnsureInstDirExists.
-    FunctionEnd
+  Call DshEnsureInstDirExists
+FunctionEnd
 
     !macro customInstall
       !insertmacro dshFinishDirectories

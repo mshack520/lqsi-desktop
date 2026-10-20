@@ -539,6 +539,45 @@ window.addEventListener('pagehide', () => {
 contextBridge.exposeInMainWorld(
   'dshDesktop',
   Object.freeze({
+    getStartupAnimationSettings: (): Promise<any> =>
+      ipcRenderer.invoke('lqsi:startup:getSettings'),
+    updateStartupAnimationSettings: (config: any): Promise<any> =>
+      ipcRenderer.invoke('lqsi:startup:updateSettings', config),
+    resetStartupAnimationSettings: (): Promise<any> =>
+      ipcRenderer.invoke('lqsi:startup:resetSettings'),
+    previewStartupAnimation: (): Promise<any> => ipcRenderer.invoke('lqsi:startup:preview'),
+    authorizeStartupSettings: (passcode: string): Promise<any> =>
+      ipcRenderer.invoke('lqsi:startup:authorize', passcode),
+    changeStartupPassword: (current: string, next: string): Promise<any> =>
+      ipcRenderer.invoke('lqsi:startup:changePassword', current, next),
+    getStartupAuthSettings: (): Promise<any> => ipcRenderer.invoke('lqsi:startup:authSettings'),
+    setStartupAutoLogin: (enabled: boolean): Promise<any> =>
+      ipcRenderer.invoke('lqsi:startup:setAutoLogin', enabled),
+    getAutoLaunchSettings: (): Promise<any> => ipcRenderer.invoke('lqsi:startup:autoLaunch'),
+    setAutoLaunchEnabled: (enabled: boolean): Promise<any> =>
+      ipcRenderer.invoke('lqsi:startup:setAutoLaunch', enabled),
+    verifyStartupPassword: (passcode: string): Promise<any> =>
+      ipcRenderer.invoke('lqsi:startup:verify', passcode),
+
+    // LQ SI：AI 智能平台工作台的嵌入网页（由主进程原生视图绘制）
+    attachEnterpriseWebsite: (siteUrl: string, systemName: string, bounds: { x: number; y: number; width: number; height: number }) =>
+      ipcRenderer.invoke('lqsi:enterprise:attachEnterpriseWebsite', siteUrl, systemName, bounds),
+    updateEnterpriseWebsiteBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
+      ipcRenderer.invoke('lqsi:enterprise:updateEnterpriseWebsiteBounds', bounds),
+    getEnterpriseWebsiteStatus: () => ipcRenderer.invoke('lqsi:enterprise:getEnterpriseWebsiteStatus'),
+    reloadEnterpriseWebsite: () => ipcRenderer.invoke('lqsi:enterprise:reloadEnterpriseWebsite'),
+    setEnterpriseWebsiteCovered: (covered: boolean) =>
+      ipcRenderer.invoke('lqsi:enterprise:setEnterpriseWebsiteCovered', covered),
+    closeEnterpriseWebsite: () => ipcRenderer.invoke('lqsi:enterprise:closeEnterpriseWebsite'),
+    saveEnterpriseWebsiteLoginCredentials: (siteUrl: string, username: string, password: string) =>
+      ipcRenderer.invoke('lqsi:enterprise:saveEnterpriseWebsiteLoginCredentials', siteUrl, username, password),
+    clearEnterpriseWebsiteLogin: (siteUrl: string) => ipcRenderer.invoke('lqsi:enterprise:clearEnterpriseWebsiteLogin', siteUrl),
+    readEnterpriseWebsiteApi: (path: string, parameters: Record<string, string | number | boolean>) =>
+      ipcRenderer.invoke('lqsi:enterprise:readEnterpriseWebsiteApi', path, parameters),
+    inspectEnterpriseWebsitePage: () => ipcRenderer.invoke('lqsi:enterprise:inspectEnterpriseWebsitePage'),
+    readEnterpriseEmployeePermissions: () => ipcRenderer.invoke('lqsi:enterprise:readEnterpriseEmployeePermissions'),
+    controlEnterpriseWebsitePage: (action: { action: string; target?: string; value?: string }) =>
+      ipcRenderer.invoke('lqsi:enterprise:controlEnterpriseWebsitePage', action),
     restartHarness: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('harness:restart'),
     getBuiltInImageGenerationStatus: (): Promise<{ enabled: boolean; marketActive: boolean }> =>
       ipcRenderer.invoke('desktop-host-plugin:status'),

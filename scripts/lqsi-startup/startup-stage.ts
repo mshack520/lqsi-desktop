@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, session } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, safeStorage, screen, session } from 'electron'
 import { createHash, randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -43,10 +43,13 @@ const DEFAULTS: AnyRecord = {
 const EXTRA_KEYS = ['orgZh', 'orgEn', 'orgSub', 'voiceSource', 'sfx']
 const DEFAULT_PASSCODE = 'mshack'
 const DONE_CHANNEL = 'lqsi:startup:done'
-const STAGE_TIMEOUT_MS = 120000
+const AUTHORIZATION_TTL_MS = 5 * 60 * 1000
 
 let registered = false
 let stageWindow: BrowserWindow | null = null
+let startupGateWindow: BrowserWindow | null = null
+let startupGateWaitingForWorkspace = false
+let authorizedPasscode: { value: string; expiresAt: number } | undefined
 /** 一次运行只播一次：Harness 重启、故障恢复等路径也会走 showSplash()。 */
 let playedThisSession = false
 
@@ -92,7 +95,48 @@ function setPasscode(passcode: string): void {
   const raw = readRaw()
   const salt = randomBytes(12).toString('hex')
   raw.passcode = { salt, hash: hashPasscode(passcode, salt), updatedAt: new Date().toISOString() }
+  if (raw.autoLogin === true) {
+    try {
+      if (safeStorage.isEncryptionAvailable()) {
+        raw.autoLoginPasscodeEncrypted = safeStorage.encryptString(passcode).toString('base64')
+      } else {
+        raw.autoLogin = false
+        delete raw.autoLoginPasscodeEncrypted
+      }
+    } catch {
+      raw.autoLogin = false
+      delete raw.autoLoginPasscodeEncrypted
+    }
+  }
   writeRaw(raw)
+}
+
+function autoLoginPasscode(raw: AnyRecord = readRaw()): string | undefined {
+  if (raw.autoLogin !== true || typeof raw.autoLoginPasscodeEncrypted !== 'string') return undefined
+  if (!safeStorage.isEncryptionAvailable()) return undefined
+  try {
+    const encrypted = Buffer.from(raw.autoLoginPasscodeEncrypted, 'base64')
+    if (encrypted.length === 0) return undefined
+    const passcode = safeStorage.decryptString(encrypted)
+    return verifyPasscode(passcode) ? passcode : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function autoLoginIsEnabled(): boolean {
+  const raw = readRaw()
+  if (autoLoginPasscode(raw)) return true
+  if (raw.autoLogin === true || raw.autoLoginPasscodeEncrypted !== undefined) {
+    raw.autoLogin = false
+    delete raw.autoLoginPasscodeEncrypted
+    writeRaw(raw)
+  }
+  return false
+}
+
+function rememberAuthorizedPasscode(passcode: string): void {
+  authorizedPasscode = { value: passcode, expiresAt: Date.now() + AUTHORIZATION_TTL_MS }
 }
 
 function stagePreloadPath(): string {
@@ -100,16 +144,29 @@ function stagePreloadPath(): string {
   return join(import.meta.dirname, '../preload/startup-gate.cjs')
 }
 
-function createStageWindow(preview: boolean): BrowserWindow {
+function createStageWindow(preview: boolean, ownerWindow?: BrowserWindow): BrowserWindow {
+  // The startup stage must cover the actual DSH window. A separate fullscreen
+  // window can land on another monitor (or use a different DPI size), exposing
+  // the main window beside it and making the startup message look off-center.
+  const ownerBounds = !preview && ownerWindow && !ownerWindow.isDestroyed()
+    ? ownerWindow.getBounds()
+    : undefined
+  const displayBounds = ownerBounds && ownerWindow?.isMaximized()
+    ? screen.getDisplayMatching(ownerBounds).workArea
+    : undefined
+  const bounds = displayBounds ?? ownerBounds
   const win = new BrowserWindow({
-    width: preview ? 1024 : 1280,
-    height: preview ? 640 : 800,
+    ...(bounds
+      ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+      : { width: preview ? 1024 : 1280, height: preview ? 640 : 800 }),
     show: false,
     frame: false,
-    fullscreen: !preview,
+    fullscreen: false,
     backgroundColor: '#000000',
     autoHideMenuBar: true,
-    skipTaskbar: preview,
+    // Keep the gate visually attached to the DSH window without creating a
+    // second LQ SI item in the Windows taskbar.
+    skipTaskbar: true,
     resizable: preview,
     movable: preview,
     webPreferences: {
@@ -139,8 +196,8 @@ function loadStage(win: BrowserWindow, preview: boolean, config?: AnyRecord): Pr
     .then(() => undefined)
 }
 
-/** 播放启动舞台；resolve 之后才继续显示主界面。 */
-export function showStartupStage(owner: BrowserWindow | null): Promise<void> {
+/** 播放启动舞台；动画结束后保留连接提示，等工作区真正打开再退场。 */
+export function showStartupStage(ownerWindow?: BrowserWindow): Promise<void> {
   const raw = readRaw()
   const cfg = configOf(raw)
   if (cfg.enabled === false) return Promise.resolve()
@@ -148,34 +205,19 @@ export function showStartupStage(owner: BrowserWindow | null): Promise<void> {
   if (cfg.mode === 'once' && raw.lastShownVersion === app.getVersion()) return Promise.resolve()
   playedThisSession = true
 
-  return new Promise<void>((resolve) => {
-    const win = createStageWindow(false)
+  return new Promise<void>((resolve, reject) => {
+    const win = createStageWindow(false, ownerWindow)
     stageWindow = win
+    startupGateWindow = win
+    startupGateWaitingForWorkspace = false
+    win.setAlwaysOnTop(true, 'screen-saver')
     let settled = false
     let destroyed = false
-    let timer: NodeJS.Timeout | undefined
-    let autoTimer: NodeJS.Timeout | undefined
-    let handoffTimer: NodeJS.Timeout | undefined
-    const autoLogin = raw.autoLogin === true
-
-    /** 播完之后不立刻黑屏：换成厂商同款的加载页（resources/splash.html），
-     *  等主界面真的起来了再退场，视觉和 LQ SI 原版一致。 */
-    const showWaitingLayer = (): void => {
-      if (destroyed) return
-      try {
-        const theme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
-        void win
-          .loadFile(join(process.resourcesPath, 'splash.html'), { query: { theme } })
-          .catch(() => undefined)
-      } catch {
-        /* best effort */
-      }
-    }
+    const autoLogin = autoLoginIsEnabled()
 
     const destroyStage = (): void => {
       if (destroyed) return
       destroyed = true
-      if (handoffTimer) clearTimeout(handoffTimer)
       try {
         if (!win.isDestroyed()) win.destroy()
       } catch {
@@ -183,13 +225,10 @@ export function showStartupStage(owner: BrowserWindow | null): Promise<void> {
       }
     }
 
-    const finish = (): void => {
+    const finishAnimation = (): void => {
       if (settled) return
       settled = true
-      if (timer) clearTimeout(timer)
-      if (autoTimer) clearTimeout(autoTimer)
       ipcMain.removeListener(DONE_CHANNEL, onDone)
-      stageWindow = null
       try {
         const next = readRaw()
         next.lastShownVersion = app.getVersion()
@@ -198,67 +237,61 @@ export function showStartupStage(owner: BrowserWindow | null): Promise<void> {
       } catch {
         /* persistence is best effort */
       }
-      try {
-        if (owner && !owner.isDestroyed()) owner.focus()
-      } catch {
-        /* focus is best effort */
-      }
-
-      // 主界面就绪交接：先盖等待层，主窗口能显示后再退场（最多等 12 秒）。
-      const ownerUsable = (): boolean => Boolean(owner && !owner.isDestroyed())
-      if (!ownerUsable() || owner!.isVisible()) {
-        destroyStage()
-        resolve()
-        return
-      }
-      showWaitingLayer()
-      const handoff = (): void => {
-        destroyStage()
-        resolve()
-      }
-      const tryHandoff = (): boolean => {
-        if (!ownerUsable()) {
-          handoff()
-          return true
-        }
-        if (owner!.isVisible() && !owner!.webContents.isLoading()) {
-          handoff()
-          return true
-        }
-        return false
-      }
-      owner!.webContents.once('did-finish-load', () => {
-        setTimeout(tryHandoff, 260)
-      })
-      owner!.once('show', () => {
-        setTimeout(tryHandoff, 260)
-      })
-      const poll = setInterval(() => {
-        if (tryHandoff()) clearInterval(poll)
-      }, 200)
-      handoffTimer = setTimeout(() => {
-        clearInterval(poll)
-        handoff()
-      }, 12000)
+      startupGateWaitingForWorkspace = true
+      resolve()
     }
 
     const onDone = (event: Electron.IpcMainEvent): void => {
-      if (event.sender === win.webContents) finish()
+      if (event.sender === win.webContents) finishAnimation()
+    }
+
+    const allowCloseForQuit = (): void => {
+      destroyStage()
     }
 
     ipcMain.on(DONE_CHANNEL, onDone)
-    timer = setTimeout(finish, STAGE_TIMEOUT_MS)
-    win.on('closed', finish)
+    win.on('close', (event) => {
+      if (!settled) event.preventDefault()
+    })
+    app.once('before-quit', allowCloseForQuit)
+    win.on('closed', () => {
+      app.removeListener('before-quit', allowCloseForQuit)
+      if (stageWindow === win) stageWindow = null
+      if (startupGateWindow === win) startupGateWindow = null
+      startupGateWaitingForWorkspace = false
+      finishAnimation()
+    })
     win.once('ready-to-show', () => {
       if (!settled) win.show()
     })
-    void loadStage(win, false, autoLogin ? { ...cfg, requireInteraction: false, allowSkip: true } : undefined)
-      .then(() => {
-        // 开了免登录：动画播完自动进入，不需要再点确认。
-        if (autoLogin && !settled) autoTimer = setTimeout(finish, 3200)
-      })
-      .catch(finish)
+    const stageConfig = autoLogin
+      ? { ...cfg, autoLogin: true, autoLoginVerified: true, requireInteraction: false }
+      : { ...cfg, autoLogin: false, autoLoginVerified: false }
+    void loadStage(win, false, stageConfig).catch((error: unknown) => {
+      settled = true
+      ipcMain.removeListener(DONE_CHANNEL, onDone)
+      startupGateWaitingForWorkspace = false
+      if (stageWindow === win) stageWindow = null
+      if (startupGateWindow === win) startupGateWindow = null
+      destroyStage()
+      reject(error)
+    })
   })
+}
+
+/** 工作区已完成导航后关闭覆盖层，避免两个启动 Logo 交替出现。 */
+export function finishStartupStage(): void {
+  if (!startupGateWaitingForWorkspace) return
+  const win = startupGateWindow
+  startupGateWindow = null
+  startupGateWaitingForWorkspace = false
+  if (stageWindow === win) stageWindow = null
+  if (!win || win.isDestroyed()) return
+  try {
+    win.destroy()
+  } catch {
+    /* window already closed */
+  }
 }
 
 /** 设置页里的「立即预览」。 */
@@ -340,11 +373,14 @@ function installFrameHeaderStrip(target?: Electron.Session): void {
 
 export function registerStartupStageIpc(): void {
   if (registered) return
-  registered = true
+  if (!app.isReady()) {
+    throw new Error('启动舞台 IPC 必须在 Electron app ready 后注册')
+  }
 
   // 工作台内嵌第三方系统（MES 等）时，对方常带 X-Frame-Options / CSP frame-ancestors，
   // 会把 iframe 打死并显示「DSH 无法嵌入此网址」。对所有会话统一摘掉这两个头。
   installFrameHeaderStrip()
+  registered = true
 
   ipcMain.handle('lqsi:startup:verify', (_event, passcode: unknown) => ({
     ok: verifyPasscode(String(passcode ?? ''))
@@ -359,7 +395,13 @@ export function registerStartupStageIpc(): void {
     const raw = readRaw()
     if (patch && typeof patch === 'object') {
       for (const [key, value] of Object.entries(patch as AnyRecord)) {
-        if (key === 'passcode' || key === 'lastShownVersion' || key === 'lastShownAt') continue
+        if (
+          key === 'passcode' ||
+          key === 'autoLogin' ||
+          key === 'autoLoginPasscodeEncrypted' ||
+          key === 'lastShownVersion' ||
+          key === 'lastShownAt'
+        ) continue
         raw[key] = value
       }
     }
@@ -369,7 +411,12 @@ export function registerStartupStageIpc(): void {
 
   ipcMain.handle('lqsi:startup:resetSettings', () => {
     const raw = readRaw()
-    writeRaw({ passcode: raw.passcode, autoLogin: raw.autoLogin })
+    const preserveAutoLogin = autoLoginIsEnabled()
+    writeRaw({
+      passcode: raw.passcode,
+      autoLogin: preserveAutoLogin,
+      ...(preserveAutoLogin ? { autoLoginPasscodeEncrypted: raw.autoLoginPasscodeEncrypted } : {})
+    })
     return { ok: true, config: configOf({}) }
   })
 
@@ -378,28 +425,48 @@ export function registerStartupStageIpc(): void {
     return { ok: true }
   })
 
-  ipcMain.handle('lqsi:startup:authorize', (_event, passcode: unknown) =>
-    verifyPasscode(String(passcode ?? ''))
-      ? { ok: true }
-      : { ok: false, error: '启动口令不正确' }
-  )
+  ipcMain.handle('lqsi:startup:authorize', (_event, passcode: unknown) => {
+    const value = String(passcode ?? '')
+    if (!verifyPasscode(value)) return { ok: false, error: '启动口令不正确' }
+    rememberAuthorizedPasscode(value)
+    return { ok: true }
+  })
 
   ipcMain.handle('lqsi:startup:changePassword', (_event, current: unknown, next: unknown) => {
     if (!verifyPasscode(String(current ?? ''))) return { ok: false, error: '启动口令不正确' }
     const text = String(next ?? '')
     if (text.length === 0 || text.length > 64) return { ok: false, error: '新口令长度不合法' }
     setPasscode(text)
+    rememberAuthorizedPasscode(text)
     return { ok: true, autoLogin: readRaw().autoLogin === true }
   })
 
   ipcMain.handle('lqsi:startup:authSettings', () => ({
     ok: true,
-    autoLogin: readRaw().autoLogin === true
+    autoLogin: autoLoginIsEnabled()
   }))
 
   ipcMain.handle('lqsi:startup:setAutoLogin', (_event, enabled: unknown) => {
     const raw = readRaw()
-    raw.autoLogin = enabled === true
+    if (enabled === true) {
+      const authorized = authorizedPasscode
+      if (!authorized || authorized.expiresAt < Date.now() || !verifyPasscode(authorized.value)) {
+        authorizedPasscode = undefined
+        return { ok: false, error: '设置授权已过期，请重新输入启动口令。' }
+      }
+      if (!safeStorage.isEncryptionAvailable()) {
+        return { ok: false, error: '系统加密存储不可用，无法安全保存启动口令。' }
+      }
+      try {
+        raw.autoLoginPasscodeEncrypted = safeStorage.encryptString(authorized.value).toString('base64')
+      } catch {
+        return { ok: false, error: '系统加密存储失败，启动口令未保存。' }
+      }
+      raw.autoLogin = true
+    } else {
+      raw.autoLogin = false
+      delete raw.autoLoginPasscodeEncrypted
+    }
     writeRaw(raw)
     return { ok: true, autoLogin: raw.autoLogin }
   })

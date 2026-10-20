@@ -95,32 +95,3 @@
         systemName: "AI 智能平台系统"
         siteUrl: ""
         apiOperations: "[]"
-
-# LQ SI: DeepSeek 官方标准端点（OpenAI Chat Completions 协议）。
-# 官方桌面默认走 https://api.deepseek.com/anthropic（Anthropic 兼容端点），
-# 部分账号在该端点会被判鉴权失败；这里提供标准端点作为默认模型路由。
-- id: llm-pi-ai
-  name: '@deepseek-ai/dsh-llm-pi-ai'
-  config:
-    providers:
-      deepseek-api:
-        displayName: DeepSeek
-        apiKeyEnv: DEEPSEEK_API_KEY
-        api: openai-completions
-        baseURL: https://api.deepseek.com
-        models:
-          - id: deepseek-chat
-            name: DeepSeek Chat
-            input:
-              - text
-          - id: deepseek-reasoner
-            name: DeepSeek Reasoner
-            input:
-              - text
-
-# 默认模型指向上面的标准端点，避免必须走账号登录型 provider。
-- id: agent-default-model
-  name: '@deepseek-ai/dsh-agent-default-model'
-  config:
-    provider: deepseek-api
-    model: deepseek-chat

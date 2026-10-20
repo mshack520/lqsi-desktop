@@ -288,7 +288,7 @@ window.__ModuleLoader__.load({
 
       function load() {
         setError(null)
-        var api = window.dshDesktop
+        var api = (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()
         if (!api || typeof api.getStartupAnimationSettings !== 'function') {
           setError('设置接口不可用，请重新启动 LQ SI。')
           return Promise.resolve()
@@ -304,9 +304,9 @@ window.__ModuleLoader__.load({
       }
 
       function unlockSettings() {
-        var api = window.dshDesktop
+        var api = (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()
         if (!api || typeof api.authorizeStartupSettings !== 'function') {
-          setUnlockError('设置验证服务不可用，请重新启动 LQ SI。')
+          try { window.location.href = 'lqsi://settings/open' } catch (e) {} setUnlockError('正在打开独立的启动动画设置窗口…')
           return
         }
         if (!unlockPassword) { setUnlockError('请输入当前启动口令。'); return }
@@ -332,7 +332,7 @@ window.__ModuleLoader__.load({
         return message
       }
       function loadAuthSettings() {
-        var api = window.dshDesktop
+        var api = (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()
         if (!api || typeof api.getStartupAuthSettings !== 'function') {
           setAuthMessage('口令设置仅在 LQ SI 桌面版中可用。')
           setAuthMessageIsError(true)
@@ -349,7 +349,7 @@ window.__ModuleLoader__.load({
       }
 
       function loadAutoLaunchSettings() {
-        var api = window.dshDesktop
+        var api = (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()
         if (!api || typeof api.getAutoLaunchSettings !== 'function') return
         api.getAutoLaunchSettings().then((result) => {
           if (!result || result.ok !== true) throw new Error((result && result.error) || '读取失败')
@@ -363,7 +363,7 @@ window.__ModuleLoader__.load({
       react.useEffect(() => {}, [])
 
       function toggleAutoLaunch(enabled) {
-        var api = window.dshDesktop
+        var api = (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()
         if (!api || typeof api.setAutoLaunchEnabled !== 'function') return
         setAutoLaunchBusy(true); setAuthMessage(''); setAuthMessageIsError(false)
         api.setAutoLaunchEnabled(enabled).then((result) => {
@@ -377,7 +377,7 @@ window.__ModuleLoader__.load({
       }
 
       function toggleAutoLogin(enabled) {
-        var api = window.dshDesktop
+        var api = (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()
         if (!api || typeof api.setStartupAutoLogin !== 'function') return
         setAuthBusy(true); setAuthMessage(''); setAuthMessageIsError(false)
         api.setStartupAutoLogin(enabled).then((result) => {
@@ -391,7 +391,7 @@ window.__ModuleLoader__.load({
       }
 
       function changeStartupPassword() {
-        var api = window.dshDesktop
+        var api = (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()
         if (!api || typeof api.changeStartupPassword !== 'function') return
         if (!currentPassword || !newPassword || !confirmPassword) {
           setAuthMessage('请填写原始口令、新口令和确认口令。')
@@ -429,7 +429,7 @@ window.__ModuleLoader__.load({
       function save() {
         if (!draft) return
         setBusy(true); setNotice(null); setError(null)
-        var api = window.dshDesktop
+        var api = (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()
         if (!api || typeof api.updateStartupAnimationSettings !== 'function') {
           setError('设置接口不可用，请重新启动 LQ SI。'); setBusy(false); return
         }
@@ -445,7 +445,7 @@ window.__ModuleLoader__.load({
 
       function reset() {
         setBusy(true); setNotice(null); setError(null)
-        var api = window.dshDesktop
+        var api = (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()
         if (!api || typeof api.resetStartupAnimationSettings !== 'function') {
           setError('设置接口不可用，请重新启动 LQ SI。'); setBusy(false); return
         }
@@ -460,7 +460,7 @@ window.__ModuleLoader__.load({
       }
 
       function preview() {
-        var api = window.dshDesktop
+        var api = (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()
         if (!api || typeof api.previewStartupAnimation !== 'function') {
           setError('预览接口不可用，请重新启动 LQ SI。')
           return
@@ -658,7 +658,7 @@ window.__ModuleLoader__.load({
       if (preference === lastThemeSync) return
       lastThemeSync = preference
       try {
-        var bridge = window.dshDesktop
+        var bridge = (function(){try{return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return (function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()}})()}})()
         if (bridge && typeof bridge.setLinkedThemePreference === 'function') {
           Promise.resolve(bridge.setLinkedThemePreference(preference)).catch(function () {})
         }

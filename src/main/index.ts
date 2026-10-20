@@ -958,10 +958,10 @@ function ensureTray(): void {
 
   const locale = harnessLocale()
   tray = new Tray(desktopIconPath())
-  tray.setToolTip('DSH Desktop')
+  tray.setToolTip('LQ SI Desktop')
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: locale === 'zh' ? '显示 DSH Desktop' : 'Show DSH Desktop', click: restoreMainWindow },
+      { label: locale === 'zh' ? '显示 LQ SI Desktop' : 'Show LQ SI Desktop', click: restoreMainWindow },
       { type: 'separator' },
       { label: locale === 'zh' ? '退出' : 'Exit', click: () => app.quit() }
     ])
@@ -1106,6 +1106,8 @@ async function openHarness(
       if (isAbortedNavigationError(error)) return
       const snapshot = runtime.snapshot()
       if (snapshot.phase !== 'ready' || snapshot.url !== url) return
+      const startupStage = await import('./startup-stage')
+      startupStage.finishStartupStage()
       throw error
     }
     if (navigationVersion !== mainWindowNavigationVersion) return
@@ -1192,8 +1194,19 @@ async function showWebHomeImport(
 }
 
 async function showSplash(): Promise<void> {
+  // LQSI_SHOW_SPLASH_V2 — LQ SI: 先播启动舞台，再走官方原有加载页流程。
   clearProfileBootConfirmation()
   const window = mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow()
+  if (!window || window.isDestroyed()) return
+  try {
+    const stage = await import('./startup-stage')
+    await stage.showStartupStage(window)
+  } catch (error) {
+    runtime.note(`[desktop] LQ SI startup stage unavailable: ${
+      error instanceof Error ? error.message : String(error)
+    }`)
+    throw error
+  }
   const navigationVersion = ++mainWindowNavigationVersion
   window.webContents.stop()
   await loadDesktopResource(window, desktopResourcePath('splash.html'), {
@@ -1201,6 +1214,12 @@ async function showSplash(): Promise<void> {
   })
   if (window.isDestroyed() || navigationVersion !== mainWindowNavigationVersion) return
   raiseWindowWithoutStealingFocus(window, process.platform, () => app.isActive())
+}
+
+async function finishStartupOverlay(): Promise<void> {
+  // LQSI_STARTUP_OVERLAY_HANDOFF_V1
+  const startupStage = await import('./startup-stage')
+  startupStage.finishStartupStage()
 }
 
 /**
@@ -3271,6 +3290,10 @@ async function showMobilePairing(): Promise<void> {
 }
 
 async function bootstrap(): Promise<void> {
+  // app.whenReady() 已完成；此时 defaultSession 可用，先注册口令与设置 IPC，再创建窗口。
+  // LQSI_STARTUP_IPC_AFTER_READY
+  const startupStage = await import('./startup-stage')
+  startupStage.registerStartupStageIpc()
   desktopDiagnostics?.startSending()
   installDesktopProtocol(desktopResourcePath)
   if (process.platform === 'darwin') app.dock?.setIcon(desktopIconPath())
@@ -3322,7 +3345,14 @@ async function bootstrap(): Promise<void> {
       if (snapshot.phase === 'ready' && snapshot.url) {
         void openHarness(snapshot.url).catch(showUnexpectedError)
       } else if (snapshot.phase === 'failed') {
-        void showRuntimeFailure(snapshot)
+        // LQSI_STARTUP_OVERLAY_FAILURE_READY
+        void finishStartupOverlay()
+          .catch((error) => {
+            runtime.note(`[desktop] unable to close startup overlay after launch failure: ${
+              error instanceof Error ? error.message : String(error)
+            }`)
+          })
+          .finally(() => showRuntimeFailure(snapshot))
       }
     }
   })
@@ -3392,17 +3422,21 @@ async function bootstrap(): Promise<void> {
     return { ok: true }
   })
   ipcMain.removeHandler('harness:renderer-healthy')
-  ipcMain.handle('harness:renderer-healthy', (event) => {
+  ipcMain.handle('harness:renderer-healthy', async (event) => {
     assertTrustedMainWindowEvent(event)
     if (safeModeVisible || failureRecoveryVisible || runtime.snapshot().phase !== 'ready') {
       return { ok: false }
     }
+    // LQSI_STARTUP_OVERLAY_HEALTH_READY
+    await finishStartupOverlay()
     scheduleNormalProfileBootConfirmation()
     return { ok: true }
   })
   ipcMain.removeHandler('harness:open-recovery')
   ipcMain.handle('harness:open-recovery', async (event, frontendErrorMessage?: unknown) => {
     assertTrustedMainWindowEvent(event)
+    // LQSI_STARTUP_OVERLAY_RECOVERY_READY
+    await finishStartupOverlay()
     desktopDiagnostics?.discardPendingPluginFailure()
     const message = typeof frontendErrorMessage === 'string' ? frontendErrorMessage : undefined
     if (message) appendRendererPluginFailureLog(message)
@@ -3681,3 +3715,13 @@ if (isDaemonLaunch(process.env, process.platform)) {
     })
   }
 }
+
+// LQ SI：企业网页嵌入视图（AI 智能平台工作台）。
+void import('./enterprise-view')
+  .then((module) => module.registerEnterpriseViewIpc())
+  .catch(() => undefined)
+
+// LQ SI：启动动画设置窗口（菜单入口）。
+void import('./startup-settings')
+  .then((module) => module.registerStartupSettingsIpc())
+  .catch(() => undefined)

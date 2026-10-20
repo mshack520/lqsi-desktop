@@ -3,7 +3,7 @@
  *   __DSH_STARTUP__              动画配置（身份、品牌、颜色、节奏）
  *   __DSH_NATIVE_STARTUP_GATE__  标记由原生窗口承载，动画收尾广播事件而不是自己移除
  *   __DSH_STARTUP_SCRIPT_URL__   动画脚本位置（相对 resources 目录）
- * 动画结束时页面派发 dsh-startup:done，这里转成 IPC 通知主进程关窗放行。
+ * 动画结束时页面派发 dsh-startup:done，这里通知主进程显示连接工作区状态。
  *
  * 该窗口只加载本地资源（resources/startup-gate.html），因此关闭上下文隔离，
  * 让这些全局量对页面可见；不开放 nodeIntegration。
@@ -23,6 +23,7 @@ try {
 }
 
 const preview = params.get('preview') === 'true'
+const autoLoginVerified = config.autoLogin === true && config.autoLoginVerified === true
 const page = window as unknown as Record<string, unknown>
 
 page.__DSH_STARTUP__ = config
@@ -41,16 +42,13 @@ function done(): void {
 
 window.addEventListener('dsh-startup:done', () => done())
 
-// 动画脚本没加载起来（素材缺失、脚本报错）时不能把用户永远锁在黑屏里。
-const failsafe = setTimeout(() => {
-  if (page.__DSH_STARTUP_LOADED__ !== true) done()
-}, 6000)
-window.addEventListener('dsh-startup:done', () => clearTimeout(failsafe))
-
 // 页面内置的备用操作区需要这几个能力；只读，不写配置。
 page.dshDesktop = {
   verifyStartupPassword: (passcode: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('lqsi:startup:verify', passcode) as Promise<{ ok: boolean }>,
+  verifyStartupAutoLogin: async (): Promise<{ ok: boolean }> => ({
+    ok: autoLoginVerified
+  }),
   authorizeStartupSettings: (passcode: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('lqsi:startup:authorize', passcode) as Promise<{ ok: boolean }>,
   getStartupAnimationSettings: (): Promise<unknown> => ipcRenderer.invoke('lqsi:startup:getSettings')

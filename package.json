@@ -1,6 +1,6 @@
 {
   "name": "dsh-desktop",
-  "version": "0.1.1",
+  "version": "0.12.27",
   "description": "A cross-platform desktop shell for DeepSeek Harness.",
   "private": true,
   "type": "module",
@@ -293,7 +293,12 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "ws": "^8.21.3",
-    "saxes": "6.0.0"
+    "saxes": "6.0.0",
+    "dsh-lingqi-brand": "file:packages/dsh-lingqi-brand",
+    "dsh-lingqi-brand-icon": "file:packages/dsh-lingqi-brand-icon",
+    "dsh-startup-screen": "file:packages/dsh-startup-screen",
+    "dsh-mes-query": "file:packages/dsh-mes-query",
+    "@scx/dsh-workbench-prototype": "file:packages/@scx/dsh-workbench-prototype"
   },
   "devDependencies": {
     "@types/js-yaml": "4.0.9",
@@ -317,7 +322,7 @@
   },
   "build": {
     "appId": "io.dsh.desktop",
-    "productName": "DSH Desktop",
+    "productName": "LQ SI",
     "asar": true,
     "asarUnpack": [
       "**/*.{node,dylib,dll,so,exe}",
@@ -470,16 +475,28 @@
       {
         "from": "build/office-cli.mjs",
         "to": "office-cli.mjs"
+      },
+      {
+        "from": "build/startup-settings.html",
+        "to": "startup-settings.html"
+      },
+      {
+        "from": "build/startup-gate.html",
+        "to": "startup-gate.html"
+      },
+      {
+        "from": "build/startup",
+        "to": "startup"
       }
     ],
     "publish": [
       {
         "provider": "generic",
-        "url": "https://dshdesktop.com/updates/latest/"
+        "url": "https://github.com/mshack520/lqsi-desktop/releases/latest/download/"
       }
     ],
     "detectUpdateChannel": false,
-    "artifactName": "dsh-desktop-${os}-${arch}.${ext}",
+    "artifactName": "lq-si-${os}-${arch}.${ext}",
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",
@@ -501,13 +518,7 @@
     },
     "win": {
       "icon": "build/icon.ico",
-      "verifyUpdateCodeSignature": true,
-      "signtoolOptions": {
-        "publisherName": "Beijing Shuju Xiangsu Intelligence Technology Co., Ltd.",
-        "signingHashAlgorithms": [
-          "sha256"
-        ]
-      },
+      "verifyUpdateCodeSignature": false,
       "requestedExecutionLevel": "asInvoker",
       "target": [
         {
@@ -519,7 +530,7 @@
       ]
     },
     "nsis": {
-      "artifactName": "dsh-desktop-windows-${arch}-setup.${ext}",
+      "artifactName": "lq-si-windows-${arch}-setup.${ext}",
       "include": "build/installer.nsh",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,

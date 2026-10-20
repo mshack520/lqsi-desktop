@@ -3,7 +3,7 @@ import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, re
 import { join } from 'node:path'
 import { compareVersions } from '../update/version-catalog'
 
-export const SERVICE_URL = 'https://dshdesktop.com/crash'
+export const SERVICE_URL = 'https://github.com/mshack520/lqsi-desktop/issues'
 export type DesktopPlatform = 'mac' | 'mac-intel' | 'windows'
 export type FailureKind = 'startup-failure' | 'harness-crash' | 'renderer-crash' | 'gpu-crash' | 'main-crash' | 'unclean-exit'
 export type UpdateDecision = { updateAvailable: false } | { updateAvailable: true; version: string; feedUrl: string }
@@ -149,13 +149,46 @@ export class DesktopService {
 
   // Keep the caller's manual flag for compatibility; presentation is local.
   // The rollout API accepts only installationId, currentVersion and platform.
+  // LQSI_CHECK_UPDATE_V4 — LQ SI: 直读 latest.yml，并在多个下载通道里挑一个通得过的。
   async checkUpdate(_manual = false): Promise<UpdateDecision> {
-    const query = new URLSearchParams({ installationId: this.installationId, currentVersion: this.options.version, platform: this.platform })
-    const response = await this.options.request(`${SERVICE_URL}/v1/updates/check?${query}`, { signal: AbortSignal.timeout(5000), redirect: 'error' })
-    if (!response.ok) throw new Error(`Update policy unavailable (${response.status})`)
-    const policy = await response.json() as Record<string, unknown>
-    if (policy?.updateAvailable === false) return { updateAvailable: false }
-    if (policy?.updateAvailable !== true || !isVersion(policy.version) || compareVersions(policy.version.split('+')[0]!, this.options.version.split('+')[0]!) <= 0 || (!isPrereleaseVersion(this.options.version) && isPrereleaseVersion(policy.version)) || policy.feedUrl !== `https://dshdesktop.com/updates/archive/${policy.version}/`) throw new Error('Invalid update policy')
-    return { updateAvailable: true, version: policy.version, feedUrl: policy.feedUrl as string }
+    const REPO = 'mshack520/lqsi-desktop'
+    const DIRECT = `https://github.com/${REPO}/releases/download/v`
+    const PROXIES = [
+      'https://ghproxy.net/https://github.com/',
+      'https://gh-proxy.com/https://github.com/',
+      'https://ghfast.top/https://github.com/'
+    ]
+    const tryGet = async (url: string): Promise<string | null> => {
+      try {
+        const response = await this.options.request(url, { signal: AbortSignal.timeout(8000) })
+        if (!response.ok) return null
+        return await response.text()
+      } catch {
+        return null
+      }
+    }
+    const latestUrl = `https://github.com/${REPO}/releases/latest/download/latest.yml`
+    const manifestUrls = [latestUrl]
+    for (const proxy of PROXIES) manifestUrls.push(`${proxy}github.com/${REPO}/releases/latest/download/latest.yml`)
+    let text: string | null = null
+    for (const url of manifestUrls) {
+      text = await tryGet(url)
+      if (text) break
+    }
+    if (!text) return { updateAvailable: false }
+    const matched = /^s*version:s*([0-9A-Za-z.+_-]+)/m.exec(text)
+    if (!matched) return { updateAvailable: false }
+    const remote = matched[1]!.trim()
+    if (!isVersion(remote)) return { updateAvailable: false }
+    const current = this.options.version
+    if (compareVersions(remote.split('+')[0]!, current.split('+')[0]!) <= 0) return { updateAvailable: false }
+    if (!isPrereleaseVersion(current) && isPrereleaseVersion(remote)) return { updateAvailable: false }
+    const bases = PROXIES.map((proxy) => `${proxy}github.com/${REPO}/releases/download/v${remote}/`)
+    bases.push(`${DIRECT}${remote}/`)
+    let chosen = bases[0]!
+    for (const base of bases) {
+      if (await tryGet(`${base}latest.yml`)) { chosen = base; break }
+    }
+    return { updateAvailable: true, version: remote, feedUrl: chosen }
   }
 }
