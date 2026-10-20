@@ -24,8 +24,17 @@ if (!existsSync(asarPath)) {
   finish()
 }
 
+let rawEntries = []
+try {
+  rawEntries = asar.listPackage(asarPath)
+} catch (error) {
+  record(false, 'asar 可读取', String(error && error.message ? error.message : error))
+}
+record(rawEntries.length > 0, 'asar 条目数', String(rawEntries.length))
+lines.push('INFO  样例条目  ' + rawEntries.slice(0, 6).map(String).join(' | '))
+console.log(lines.at(-1))
+
 const BS = String.fromCharCode(92)
-const rawEntries = asar.listPackage(asarPath)
 const trimSep = (p) => (p.charAt(0) === BS || p.charAt(0) === '/' ? p.slice(1) : p)
 const posix = (p) => trimSep(p).split(BS).join('/')
 const entries = rawEntries.map(posix)
