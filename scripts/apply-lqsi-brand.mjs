@@ -22,8 +22,10 @@ if (!REPO_PATTERN.test(OWNER_REPO) || /^OWNER\//i.test(OWNER_REPO)) {
 const PLUGINS = ['dsh-lingqi-brand', 'dsh-lingqi-brand-icon', 'dsh-startup-screen', 'dsh-mes-query']
 // 带 @scope 的私有包：MES 工作台原型（工作台里的「AI 智能系统」入口）
 const SCX_PLUGINS = ['@scx/dsh-workbench-prototype']
-const ASSETS = ['splash.html', 'startup-gate.html', 'dsh-loader.gif', 'dsh-loader-dark.gif', 'icon.png', 'icon.ico']
-// 启动动画窗口要加载 splash.html + startup/splash.js(.css)，缺一个就只闪一下。
+// 启动画面资源。主窗口的 splash.html 是动画结束后的“正在连接工作区”提示，
+// 需保留仓库里的 build/splash.html，不能用 assets/splash.html 的品牌首屏覆盖。
+const ASSETS = ['startup-gate.html', 'dsh-loader.gif', 'dsh-loader-dark.gif', 'icon.png', 'icon.ico']
+// 启动动画窗口要加载 startup-gate.html + startup/splash.js(.css)，缺一个就只闪一下。
 const EXTRA_RESOURCES = [
   { from: 'build/splash.html', to: 'splash.html' },
   { from: 'build/startup-gate.html', to: 'startup-gate.html' },
