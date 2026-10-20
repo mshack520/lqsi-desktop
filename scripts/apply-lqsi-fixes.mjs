@@ -165,4 +165,23 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
   }
 }
 
+/* ── 4 启动设置页：工作台内嵌页面拿不到 window.dshDesktop 时向上找 ────── */
+{
+  const rel = 'packages/dsh-startup-screen/lib/client.js'
+  if (!existsSync(join(repo, rel))) {
+    log(`${rel} 不存在，跳过设置页桥接`)
+  } else {
+    const text = read(rel)
+    if (text.includes('{LQSI_BRIDGE_FALLBACK}')) {
+      log(`${rel} 已含桥接兜底`)
+    } else {
+      const fallback =
+        '{LQSI_BRIDGE_FALLBACK}(window.dshDesktop || (window.parent && window.parent.dshDesktop) || (window.top && window.top.dshDesktop))'
+      const next = text.split('window.dshDesktop').join(fallback)
+      write(rel, next)
+      log(`${rel} 已改为多窗口查找 dshDesktop`)
+    }
+  }
+}
+
 log('完成')
