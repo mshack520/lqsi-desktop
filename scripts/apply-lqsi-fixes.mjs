@@ -28,7 +28,7 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
 /* ── 1 安装器：盘符根目录自动补目录名 ─────────────────────────────────── */
 {
   const rel = 'build/installer.nsh'
-  const text = read(rel)
+  let text = read(rel)
   if (text.includes('LQSI_ROOT_FIX')) {
     log(`${rel} 已包含盘符修复`)
   } else {
@@ -38,6 +38,16 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
     const end = text.indexOf('FunctionEnd', start)
     if (end < 0) fail(`${rel} DshEnsureInstDirExists 缺少 FunctionEnd`)
     const BS = String.fromCharCode(92)
+    // NSIS 点击“下一步/安装”时会调用 .onVerifyInstDir 做路径校验；
+    // 在这里先把根目录补名并建目录，才不会在校验阶段被判“目录不存在”。
+    const verify = 'Function .onVerifyInstDir'
+    const vi = text.indexOf(verify)
+    if (vi >= 0) {
+      const ve = text.indexOf('FunctionEnd', vi)
+      if (ve > 0) {
+        text = `${text.slice(0, vi)}Function .onVerifyInstDir${String.fromCharCode(10)}  Call DshEnsureInstDirExists${String.fromCharCode(10)}${text.slice(ve)}`
+      }
+    }
     const body = [
       '; LQSI_ROOT_FIX: 选盘符根目录（F: 或 F:/ ）时自动补成 F:/LQ SI，并创建目录。',
       'Function DshEnsureInstDirExists',
