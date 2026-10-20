@@ -31,7 +31,9 @@ try {
   record(false, 'asar 可读取', String(error && error.message ? error.message : error))
 }
 record(rawEntries.length > 0, 'asar 条目数', String(rawEntries.length))
-lines.push('INFO  样例条目  ' + rawEntries.slice(0, 6).map(String).join(' | '))
+const outEntries = entries.filter((e) => e.startsWith('/out'))
+lines.push('INFO  /out 条目数  ' + outEntries.length + '  ' + outEntries.slice(0, 8).join(' | '))
+lines.push('INFO  preload 条目  ' + entries.filter((e) => e.includes('/preload/')).slice(0, 8).join(' | '))
 console.log(lines.at(-1))
 
 const BS = String.fromCharCode(92)
