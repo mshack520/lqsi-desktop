@@ -101,6 +101,8 @@ const BRIDGE_METHODS = `    getStartupAnimationSettings: (): Promise<any> =>
 
 /* ── 5 showSplash 改为原生舞台 ──────────────────────────────────────────── */
 const NEW_SHOW_SPLASH = `async function showSplash(): Promise<void> {
+  // LQ SI: 保留官方原实现里的启动确认清理，否则重启后会一直等确认而卡住。
+  clearProfileBootConfirmation()
   const window = mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow()
   try {
     const stage = await import('./startup-stage')
