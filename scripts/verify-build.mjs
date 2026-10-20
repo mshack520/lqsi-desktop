@@ -24,18 +24,28 @@ if (!existsSync(asarPath)) {
   finish()
 }
 
-const entries = asar.listPackage(asarPath).map((p) => p.split(String.fromCharCode(92)).join('/'))
+const BS = String.fromCharCode(92)
+const rawEntries = asar.listPackage(asarPath)
+const trimSep = (p) => (p.charAt(0) === BS || p.charAt(0) === '/' ? p.slice(1) : p)
+const posix = (p) => trimSep(p).split(BS).join('/')
+const entries = rawEntries.map(posix)
 const has = (p) => entries.some((e) => e === p || e.endsWith(p))
 const read = (p) => {
-  const entry = entries.find((e) => e === p || e.endsWith(p))
-  if (!entry) return ''
+  const idx = rawEntries.findIndex((raw, i) => entries[i] === p || entries[i].endsWith(p))
+  if (idx < 0) return ''
   try {
-    return asar.extractFile(asarPath, entry.replace(/^\//u, '')).toString('utf8')
+    return asar.extractFile(asarPath, trimSep(rawEntries[idx])).toString('utf8')
   } catch {
     return ''
   }
 }
-const readPattern = (re) => entries.filter((e) => re.test(e)).map(read).join(String.fromCharCode(10))
+const readPattern = (re) => entries.map((e, i) => (re.test(e) ? i : -1)).filter((i) => i >= 0).map((i) => {
+  try {
+    return asar.extractFile(asarPath, trimSep(rawEntries[i])).toString('utf8')
+  } catch {
+    return ''
+  }
+}).join(String.fromCharCode(10))
 
 // 1) 启动舞台与设置窗口的编译产物
 record(has('/out/preload/startup-gate.cjs'), '含启动舞台 preload')
