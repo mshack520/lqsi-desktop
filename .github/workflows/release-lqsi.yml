@@ -36,6 +36,9 @@ jobs:
       - name: 应用品牌（名称/图标/启动动画/插件）
         run: node scripts/apply-lqsi-brand.mjs
 
+      - name: 修品牌细节（安装目录/首启文案/模型列表）
+        run: node scripts/apply-lqsi-fixes.mjs
+
       - name: 把更新源改到本仓库
         run: node scripts/patch-update-source.mjs --repo "$env:LQSI_REPO"
 
@@ -47,6 +50,9 @@ jobs:
 
       - name: 构建前端与主进程
         run: npm run build
+
+      - name: 统一界面文案（DSH Desktop / dataelem → LQ SI）
+        run: node scripts/apply-lqsi-copy.mjs
 
       - name: 打包 Windows 安装包（不签名、不自动发布）
         run: node scripts/electron-builder-windows.mjs --win --x64 --publish never
