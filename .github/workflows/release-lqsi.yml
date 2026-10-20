@@ -59,13 +59,13 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
-      - name: 诊断打包内容（品牌插件 / 启动素材）
+      - name: 打包自检（缺东西直接失败，不发布）
         shell: bash
         run: |
-          npx --yes @electron/asar list dist/win-unpacked/resources/app.asar > asar.txt || true
-          echo "== 品牌与 MES 包 =="; grep -E "lingqi|@scx|mes-query|startup-screen" asar.txt | head -20
-          echo "== resources 根目录 =="; ls dist/win-unpacked/resources | head -30
-          echo "== resources/startup =="; ls dist/win-unpacked/resources/startup 2>/dev/null | head
+          npx --yes @electron/asar list dist/win-unpacked/resources/app.asar | head -40 || true
+          node scripts/verify-build.mjs
+          echo "---- verify.txt ----"
+          cat dist/verify.txt
 
       - name: 生成版本目录 versions.json
         shell: bash
@@ -86,6 +86,7 @@ jobs:
             dist/*.exe
             dist/latest.yml
             dist/versions.json
+            dist/verify.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
