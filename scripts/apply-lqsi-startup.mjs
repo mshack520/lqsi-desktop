@@ -35,7 +35,8 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
 /* ── 1/2 源文件 ─────────────────────────────────────────────────────────── */
 const COPIES = [
   ['startup-stage.ts', 'src/main/startup-stage.ts'],
-  ['startup-gate.ts', 'src/preload/startup-gate.ts']
+  ['startup-gate.ts', 'src/preload/startup-gate.ts'],
+  ['enterprise-view.ts', 'src/main/enterprise-view.ts']
 ]
 for (const [file, target] of COPIES) {
   const from = join(source, file)
@@ -172,6 +173,59 @@ void import('./startup-stage')
 `
     )
     log(`${rel} 已注册启动舞台 IPC`)
+  }
+}
+
+
+/* ── 企业网页嵌入视图：preload 桥 + 主进程 IPC 注册 ───────────────── */
+{
+  const rel = 'src/preload/index.ts'
+  const bridge = `
+    // LQ SI：AI 智能平台工作台的嵌入网页（由主进程原生视图绘制）
+    attachEnterpriseWebsite: (siteUrl: string, systemName: string, bounds: { x: number; y: number; width: number; height: number }) =>
+      ipcRenderer.invoke('lqsi:enterprise:attachEnterpriseWebsite', siteUrl, systemName, bounds),
+    updateEnterpriseWebsiteBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
+      ipcRenderer.invoke('lqsi:enterprise:updateEnterpriseWebsiteBounds', bounds),
+    getEnterpriseWebsiteStatus: () => ipcRenderer.invoke('lqsi:enterprise:getEnterpriseWebsiteStatus'),
+    reloadEnterpriseWebsite: () => ipcRenderer.invoke('lqsi:enterprise:reloadEnterpriseWebsite'),
+    setEnterpriseWebsiteCovered: (covered: boolean) =>
+      ipcRenderer.invoke('lqsi:enterprise:setEnterpriseWebsiteCovered', covered),
+    closeEnterpriseWebsite: () => ipcRenderer.invoke('lqsi:enterprise:closeEnterpriseWebsite'),
+    saveEnterpriseWebsiteLoginCredentials: (siteUrl: string, username: string, password: string) =>
+      ipcRenderer.invoke('lqsi:enterprise:saveEnterpriseWebsiteLoginCredentials', siteUrl, username, password),
+    clearEnterpriseWebsiteLogin: (siteUrl: string) => ipcRenderer.invoke('lqsi:enterprise:clearEnterpriseWebsiteLogin', siteUrl),
+    readEnterpriseWebsiteApi: (path: string, parameters: Record<string, string | number | boolean>) =>
+      ipcRenderer.invoke('lqsi:enterprise:readEnterpriseWebsiteApi', path, parameters),
+    inspectEnterpriseWebsitePage: () => ipcRenderer.invoke('lqsi:enterprise:inspectEnterpriseWebsitePage'),
+    readEnterpriseEmployeePermissions: () => ipcRenderer.invoke('lqsi:enterprise:readEnterpriseEmployeePermissions'),
+    controlEnterpriseWebsitePage: (action: { action: string; target?: string; value?: string }) =>
+      ipcRenderer.invoke('lqsi:enterprise:controlEnterpriseWebsitePage', action),
+`
+  if (!existsSync(join(repo, rel))) {
+    log(`${rel} 不存在，跳过企业网页桥`)
+  } else if (read(rel).includes('attachEnterpriseWebsite')) {
+    log(`${rel} 已含企业网页桥`)
+  } else {
+    const anchor2 = "    restartHarness: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('harness:restart'),"
+    const text2 = read(rel)
+    if (!text2.includes(anchor2)) fail(`${rel} 找不到企业网页锚点`)
+    write(rel, text2.replace(anchor2, `${bridge}${anchor2}`))
+    log(`${rel} 已加入 12 个企业网页方法`)
+  }
+
+  const mainRel = 'src/main/index.ts'
+  if (existsSync(join(repo, mainRel)) && !read(mainRel).includes('registerEnterpriseViewIpc')) {
+    const text = read(mainRel)
+    write(
+      mainRel,
+      `${text}
+// LQ SI：企业网页嵌入视图（AI 智能平台工作台）。
+void import('./enterprise-view')
+  .then((module) => module.registerEnterpriseViewIpc())
+  .catch(() => undefined)
+`
+    )
+    log(`${mainRel} 已注册企业网页 IPC`)
   }
 }
 
