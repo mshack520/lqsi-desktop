@@ -349,7 +349,7 @@ function renderAbout(): void {
   card.tabIndex = -1
   card.setAttribute('role', 'dialog')
   card.setAttribute('aria-modal', 'false')
-  card.setAttribute('aria-label', zh ? '关于 DSH Desktop' : 'About DSH Desktop')
+  card.setAttribute('aria-label', zh ? '关于 LQ SI' : 'About LQ SI')
 
   const header = element('div', 'about-header')
   header.appendChild(appIcon())
@@ -376,7 +376,7 @@ function renderAbout(): void {
   header.appendChild(switcher)
   card.appendChild(header)
   const title = element('h2', 'about-title')
-  title.textContent = 'DSH Desktop'
+  title.textContent = 'LQ SI'
   card.appendChild(title)
   const version = element('p', 'about-line')
   version.textContent = `v${info.desktopVersion} (${zh ? '内置' : 'bundled'} Harness ${info.harnessVersion} `
@@ -512,9 +512,8 @@ const styles = `
   .row { display:flex; gap:12px; align-items:center; }
   .body { min-width:0; flex:1; }
   .centered .row { display:block; }
-  .app-icon { display:inline-flex; width:56px; height:56px; padding:6px; background:#0d1716; color:#fff; border-radius:12px; flex:none; position:relative; }
+  .app-icon { display:inline-flex; width:56px; height:56px; padding:0; background:transparent; color:#fff; border-radius:12px; flex:none; position:relative; }
   .app-icon svg { width:100%; height:100%; }
-  .app-icon svg path { fill:currentColor; }
   .notification { padding:16px; }
   .notification .app-icon { width:40px; height:40px; border-radius:9px; }
   .title,.about-title { margin:16px 0 8px; font-size:18px; line-height:26px; font-weight:600; }

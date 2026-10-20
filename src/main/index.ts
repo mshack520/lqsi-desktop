@@ -1873,8 +1873,8 @@ async function showAbout(window: BrowserWindow): Promise<void> {
   const checkForUpdatesLabel = locale === 'zh' ? '检查更新' : 'Check for Updates'
   const result = await dialog.showMessageBox(window, {
     type: 'info',
-    title: 'DSH Desktop',
-    message: locale === 'zh' ? '关于 DSH Desktop' : 'About DSH Desktop',
+    title: 'LQ SI',
+    message: locale === 'zh' ? '关于 LQ SI' : 'About LQ SI',
     detail: aboutDetail(
       app.getVersion(),
       bundledHarnessVersion(bundledRuntimeRoot()),
@@ -3127,7 +3127,7 @@ function installMenu(): void {
           label: app.name,
           submenu: [
             {
-              label: isChinese ? '关于 DSH Desktop' : 'About DSH Desktop',
+              label: isChinese ? '关于 LQ SI' : 'About LQ SI',
               click: () => {
                 if (mainWindow && !mainWindow.isDestroyed()) {
                   void showAbout(mainWindow).catch(showUnexpectedError)
