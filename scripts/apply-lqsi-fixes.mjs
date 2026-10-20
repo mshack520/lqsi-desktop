@@ -275,4 +275,28 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
   }
 }
 
+/* ── 7 启动动画面板：无宿主桥时直接唤起 LQ SI 独立设置窗口 ────────── */
+{
+  const rel = 'packages/dsh-startup-screen/lib/client.js'
+  if (!existsSync(join(repo, rel))) {
+    log(`${rel} 不存在，跳过设置入口改写`)
+  } else {
+    const text = read(rel)
+    const marker = 'lqsi://settings/open'
+    if (text.includes(marker)) {
+      log(`${rel} 已有设置窗口入口`)
+    } else {
+      const target = "setUnlockError('设置验证服务不可用，请重新启动 LQ SI。')"
+      if (!text.includes(target)) {
+        log(`${rel} 未找到“服务不可用”分支，跳过`)
+      } else {
+        const replacement =
+          "try { window.location.href = 'lqsi://settings/open' } catch (e) {} setUnlockError('正在打开独立的启动动画设置窗口…')"
+        write(rel, text.replace(target, replacement))
+        log(`${rel} 面板改为唤起独立设置窗口`)
+      }
+    }
+  }
+}
+
 log('完成')
