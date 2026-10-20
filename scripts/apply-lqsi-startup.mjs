@@ -36,7 +36,9 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
 const COPIES = [
   ['startup-stage.ts', 'src/main/startup-stage.ts'],
   ['startup-gate.ts', 'src/preload/startup-gate.ts'],
-  ['enterprise-view.ts', 'src/main/enterprise-view.ts']
+  ['enterprise-view.ts', 'src/main/enterprise-view.ts'],
+  ['startup-settings.ts', 'src/main/startup-settings.ts'],
+  ['startup-settings.preload.ts', 'src/preload/startup-settings.ts']
 ]
 for (const [file, target] of COPIES) {
   const from = join(source, file)
@@ -63,6 +65,16 @@ for (const [file, target] of COPIES) {
       )
     )
     log(`${rel} 已加入 startup-gate 入口`)
+  }
+  const withGate = read(rel)
+  if (withGate.includes("'startup-settings':")) {
+    log(`${rel} 已包含 startup-settings 入口`)
+  } else {
+    const anchor = "'startup-gate': resolve('src/preload/startup-gate.ts')"
+    if (!withGate.includes(anchor)) fail(`${rel} 找不到 startup-gate 入口锚点`)
+    write(rel, withGate.replace(anchor, `${anchor},
+          'startup-settings': resolve('src/preload/startup-settings.ts')`))
+    log(`${rel} 已加入 startup-settings 入口`)
   }
 }
 
@@ -107,6 +119,7 @@ const NEW_SHOW_SPLASH = [
   '  // ' + SHOW_SPLASH_MARKER + ' — LQ SI: 先播启动舞台，再走官方原有加载页流程。',
   '  clearProfileBootConfirmation()',
   '  const window = mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow()',
+  '  if (!window || window.isDestroyed()) return',
   '  try {',
   "    const stage = await import('./startup-stage')",
   '    await stage.showStartupStage(window)',
@@ -226,6 +239,43 @@ void import('./enterprise-view')
 `
     )
     log(`${mainRel} 已注册企业网页 IPC`)
+  }
+}
+
+/* ── 7 启动动画设置窗口（菜单入口 + 页面素材） ─────────────────────── */
+{
+  const page = join(repo, 'assets', 'startup-settings.html')
+  const buildDir = join(repo, 'build')
+  if (!existsSync(page)) {
+    log('assets/startup-settings.html 不存在，跳过设置窗口')
+  } else {
+    mkdirSync(buildDir, { recursive: true })
+    copyFileSync(page, join(buildDir, 'startup-settings.html'))
+    const pkgRel = 'package.json'
+    const pkg = JSON.parse(read(pkgRel))
+    pkg.build ??= {}
+    pkg.build.extraResources ??= []
+    const extra = pkg.build.extraResources
+    if (!extra.some((entry) => entry && entry.to === 'startup-settings.html')) {
+      extra.push({ from: 'build/startup-settings.html', to: 'startup-settings.html' })
+      write(pkgRel, JSON.stringify(pkg, null, 2))
+    }
+    log('启动动画设置页面已打包')
+  }
+
+  const mainRel = 'src/main/index.ts'
+  if (existsSync(join(repo, mainRel)) && !read(mainRel).includes('registerStartupSettingsIpc')) {
+    const text = read(mainRel)
+    write(
+      mainRel,
+      `${text}
+// LQ SI：启动动画设置窗口（菜单入口）。
+void import('./startup-settings')
+  .then((module) => module.registerStartupSettingsIpc())
+  .catch(() => undefined)
+`
+    )
+    log(`${mainRel} 已注册启动动画设置窗口`)
   }
 }
 
