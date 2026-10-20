@@ -43,10 +43,36 @@ function writeLogin(next: Record<string, { username: string; password: string }>
   } catch { /* 保存失败不影响网页使用 */ }
 }
 
-/** 用保存过的 MES 账号在网页会话里登录一次，省得每次手动输。 */
+/** 每个站点只尝试一次自动登录，且只在真的看到登录框时才填。 */
+const autoLoginTried = new Set<string>()
+
 async function attemptAutoLogin(target: WebContentsView, siteUrl: string): Promise<void> {
+  if (autoLoginTried.has(siteUrl)) return
   const record = readLogin()[siteUrl]
-  if (!record?.username || !record?.password) return
+  if (!record?.username || !record?.password) {
+    autoLoginTried.add(siteUrl)
+    return
+  }
+  // 只有在页面上真的显示着登录框时才登录，避免已登录页面被反复刷新。
+  let needsLogin = false
+  try {
+    needsLogin = await target.webContents.executeJavaScript(
+      `(() => {
+        const field = document.querySelector('input[type=password]')
+        if (!field) return false
+        const box = field.getBoundingClientRect()
+        return box.width > 0 && box.height > 0
+      })()`,
+      true,
+    )
+  } catch {
+    return
+  }
+  if (needsLogin !== true) {
+    autoLoginTried.add(siteUrl)
+    return
+  }
+  autoLoginTried.add(siteUrl)
   try {
     const base = new URL(siteUrl)
     const prefix = base.pathname.replace(/\/$/u, '')
@@ -61,7 +87,7 @@ async function attemptAutoLogin(target: WebContentsView, siteUrl: string): Promi
       true,
     )
     if (ok === true) target.webContents.reload()
-  } catch { /* 登录失败时保留原页面，让用户手动登录 */ }
+  } catch { /* 自动登录失败时保留页面，让用户手动登录 */ }
 }
 
 function setState(patch: Partial<ViewState>): void {
@@ -105,6 +131,7 @@ const bridge = {
       target.setBounds(bounds)
       target.setVisible(true)
       currentSite = siteUrl
+      autoLoginTried.delete(siteUrl)
       setState({ url: siteUrl, covered: false })
       if (target.webContents.getURL() !== siteUrl) await target.webContents.loadURL(siteUrl)
       return { ok: true }
