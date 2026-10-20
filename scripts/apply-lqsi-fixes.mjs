@@ -203,4 +203,61 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
   }
 }
 
+/* ── 6 检查更新：直接读 GitHub 最新版清单，不再依赖 raw/中转接口 ───── */
+{
+  const rel = 'src/main/desktop-service/service.ts'
+  const marker = 'LQSI_CHECK_UPDATE_V3'
+  if (!existsSync(join(repo, rel))) {
+    log(`${rel} 不存在，跳过检查更新改写`)
+  } else {
+    const text = read(rel)
+    if (text.includes(marker)) {
+      log(`${rel} 检查更新已是直读清单`)
+    } else {
+      const signature = '  async checkUpdate(_manual = false): Promise<UpdateDecision> {'
+      const start = text.indexOf(signature)
+      if (start < 0) fail(`${rel} 找不到 checkUpdate`)
+      let depth = 0
+      let end = -1
+      for (let index = text.indexOf('{', start); index < text.length; index += 1) {
+        const char = text[index]
+        if (char === '{') depth += 1
+        else if (char === '}') {
+          depth -= 1
+          if (depth === 0) { end = index + 1; break }
+        }
+      }
+      if (end < 0) fail(`${rel} 无法确定 checkUpdate 范围`)
+      const replacement = [
+        '  // ' + marker + ' — LQ SI: 直接读 GitHub 最新发布的 latest.yml。',
+        '  async checkUpdate(_manual = false): Promise<UpdateDecision> {',
+        "    const manifestUrl = 'https://github.com/mshack520/lqsi-desktop/releases/latest/download/latest.yml'",
+        '    let text = \'\'',
+        '    try {',
+        '      const response = await this.options.request(manifestUrl, { signal: AbortSignal.timeout(8000) })',
+        '      if (!response.ok) return { updateAvailable: false }',
+        '      text = await response.text()',
+        '    } catch {',
+        '      return { updateAvailable: false }',
+        '    }',
+        '    const matched = /^\s*version:\s*([0-9A-Za-z.+_-]+)/m.exec(text)',
+        '    if (!matched) return { updateAvailable: false }',
+        '    const remote = matched[1]!.trim()',
+        '    if (!isVersion(remote)) return { updateAvailable: false }',
+        '    const current = this.options.version',
+        "    if (compareVersions(remote.split('+')[0]!, current.split('+')[0]!) <= 0) return { updateAvailable: false }",
+        '    if (!isPrereleaseVersion(current) && isPrereleaseVersion(remote)) return { updateAvailable: false }',
+        '    return {',
+        '      updateAvailable: true,',
+        '      version: remote,',
+        "      feedUrl: `https://github.com/mshack520/lqsi-desktop/releases/download/v${remote}/`",
+        '    }',
+        '  }'
+      ].join('\n')
+      write(rel, text.slice(0, start) + replacement + text.slice(end))
+      log(`${rel} 检查更新改为直读 latest.yml`)
+    }
+  }
+}
+
 log('完成')
