@@ -158,26 +158,15 @@ export function showStartupStage(owner: BrowserWindow | null): Promise<void> {
     let handoffTimer: NodeJS.Timeout | undefined
     const autoLogin = raw.autoLogin === true
 
-    /** 播完之后不立刻黑屏：先在前台盖一层「正在加载工作台」，等主界面真的起来了再退场。 */
+    /** 播完之后不立刻黑屏：换成厂商同款的加载页（resources/splash.html），
+     *  等主界面真的起来了再退场，视觉和 LQ SI 原版一致。 */
     const showWaitingLayer = (): void => {
       if (destroyed) return
       try {
-        void win.webContents.executeJavaScript(
-          `(() => {
-            if (document.getElementById('lqsi-waiting')) return
-            const style = document.createElement('style')
-            style.textContent = '#lqsi-waiting{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#000;color:#fff;font-family:"Segoe UI","Microsoft YaHei",sans-serif;z-index:2147483647}' +
-              '#lqsi-waiting .n{font-size:13px;letter-spacing:.35em;opacity:.75}' +
-              '#lqsi-waiting .s{width:34px;height:34px;border-radius:50%;border:2px solid rgba(217,45,57,.25);border-top-color:#d92d39;animation:lqsiSpin .9s linear infinite}' +
-              '@keyframes lqsiSpin{to{transform:rotate(360deg)}}'
-            document.head.appendChild(style)
-            const box = document.createElement('div')
-            box.id = 'lqsi-waiting'
-            box.innerHTML = '<div class="s"></div><div class="n">正在加载工作台</div>'
-            document.body.appendChild(box)
-            document.body.style.opacity = '1'
-          })()`
-        ).catch(() => undefined)
+        const theme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+        void win
+          .loadFile(join(process.resourcesPath, 'splash.html'), { query: { theme } })
+          .catch(() => undefined)
       } catch {
         /* best effort */
       }
@@ -301,40 +290,61 @@ async function showPreviewStage(): Promise<void> {
   await loadStage(win, true)
 }
 
+
+/** 允许把第三方系统嵌进工作台：摘掉 X-Frame-Options / CSP frame-ancestors。 */
+const strippedSessions = new WeakSet<Electron.Session>()
+
+function installFrameHeaderStrip(target?: Electron.Session): void {
+  const apply = (s: Electron.Session): void => {
+    if (strippedSessions.has(s)) return
+    strippedSessions.add(s)
+    try {
+      s.webRequest.onHeadersReceived({ urls: ['http://*/*', 'https://*/*'] }, (details, callback) => {
+        const headers = { ...(details.responseHeaders ?? {}) }
+        for (const key of Object.keys(headers)) {
+          const lower = key.toLowerCase()
+          if (lower === 'x-frame-options') delete headers[key]
+          else if (lower === 'content-security-policy' || lower === 'content-security-policy-report-only') {
+            const list = Array.isArray(headers[key]) ? headers[key] : [String(headers[key] ?? '')]
+            headers[key] = list
+              .map((item) =>
+                item
+                  .split(';')
+                  .map((part) => part.trim())
+                  .filter((part) => part && !part.toLowerCase().startsWith('frame-ancestors'))
+                  .join('; ')
+              )
+              .filter((item) => item.length > 0)
+          }
+        }
+        callback({ responseHeaders: headers })
+      })
+    } catch {
+      /* 注册失败不影响主流程 */
+    }
+  }
+  if (target) {
+    apply(target)
+    return
+  }
+  apply(session.defaultSession)
+  // 工作台里的 webview 可能用独立会话，这里对所有新建 webContents 的会话补一次。
+  app.on('web-contents-created', (_event, contents) => {
+    try {
+      apply(contents.session)
+    } catch {
+      /* ignore */
+    }
+  })
+}
+
 export function registerStartupStageIpc(): void {
   if (registered) return
   registered = true
 
   // 工作台内嵌第三方系统（MES 等）时，对方常带 X-Frame-Options / CSP frame-ancestors，
-  // 会把 iframe 打死并显示「DSH 无法嵌入此网址」。这里只对 http(s) 响应摘掉这两个头，
-  // 应用自身走 app:// 协议，不受影响。
-  try {
-    const filter = { urls: ['http://*/*', 'https://*/*'] }
-    session.defaultSession.webRequest.onHeadersReceived(filter, (details, callback) => {
-      const headers = { ...(details.responseHeaders ?? {}) }
-      for (const key of Object.keys(headers)) {
-        const lower = key.toLowerCase()
-        if (lower === 'x-frame-options') delete headers[key]
-        if (lower === 'content-security-policy') {
-          const value = headers[key]
-          const list = Array.isArray(value) ? value : [String(value ?? '')]
-          headers[key] = list
-            .map((item) =>
-              item
-                .split(';')
-                .map((part) => part.trim())
-                .filter((part) => part && !part.toLowerCase().startsWith('frame-ancestors'))
-                .join('; ')
-            )
-            .filter((item) => item.length > 0)
-        }
-        if (lower === 'content-security-policy-report-only') delete headers[key]
-      }
-      callback({ responseHeaders: headers })
-    })
-  } catch {
-    /* 注册失败时不影响主流程 */
-  }
+  // 会把 iframe 打死并显示「DSH 无法嵌入此网址」。对所有会话统一摘掉这两个头。
+  installFrameHeaderStrip()
 
   ipcMain.handle('lqsi:startup:verify', (_event, passcode: unknown) => ({
     ok: verifyPasscode(String(passcode ?? ''))
