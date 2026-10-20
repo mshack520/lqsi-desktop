@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, MenuItem, ipcMain } from 'electron'
+import { app, BrowserWindow, Menu, MenuItem, ipcMain, webContents } from 'electron'
 import { join } from 'node:path'
 
 let settingsWindow: BrowserWindow | null = null
@@ -64,6 +64,24 @@ export function registerStartupSettingsIpc(): void {
     return { ok: true }
   })
 }
+
+/** 插件面板拿不到宿主桥时，会导航到 lqsi://settings/open，这里接管。 */
+function installSettingsProtocol(): void {
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('will-navigate', (event, url) => {
+      if (!url.startsWith('lqsi://settings')) return
+      event.preventDefault()
+      openStartupSettings()
+    })
+    contents.setWindowOpenHandler(({ url }) => {
+      if (!url.startsWith('lqsi://settings')) return { action: 'allow' }
+      openStartupSettings()
+      return { action: 'deny' }
+    })
+  })
+}
+
+installSettingsProtocol()
 
 void app.whenReady().then(() => {
   // 菜单要等应用 ready 之后才可靠。
