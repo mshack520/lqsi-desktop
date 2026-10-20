@@ -29,42 +29,45 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
 {
   const rel = 'build/installer.nsh'
   let text = read(rel)
-  if (text.includes('LQSI_ROOT_FIX')) {
+  if (text.includes('DshNormalizeDriveRootFinal')) {
     log(`${rel} 已包含盘符修复`)
   } else {
-    const leaveAnchor = `    !define MUI_PAGE_CUSTOMFUNCTION_LEAVE DshEnsureInstDirExists
-
-    Function DshEnsureInstDirExists
-      CreateDirectory "$INSTDIR"
-    FunctionEnd`
-    if (!text.includes(leaveAnchor)) fail(`${rel} 找不到 LEAVE 钩子锚点`)
-    const replacement = `    ; LQSI_ROOT_FIX: 目录页点“下一步/安装”时再兜一次，
-    ; 因为 NSIS 经典目录页的编辑框 OnChange 不一定触发。
-    !define MUI_PAGE_CUSTOMFUNCTION_LEAVE DshEnsureInstDirExists
+    const fnStart = text.indexOf('Function DshNormalizeDriveRoot')
+    if (fnStart < 0) fail(`${rel} 找不到 DshNormalizeDriveRoot`)
+    const fnEnd = text.indexOf('FunctionEnd', fnStart)
+    if (fnEnd < 0) fail(`${rel} DshNormalizeDriveRoot 缺少 FunctionEnd`)
+    const insertAt = text.indexOf(String.fromCharCode(10), fnEnd + 'FunctionEnd'.length) + 1
+    const extra = `
+    ; LQSI_ROOT_FIX: 点“安装”时再兜一次（编辑框 OnChange 不一定触发），
+    ; 把 "F:" / "F:\\" 规范成 "F:\LQ SI" 并确保目录存在。
+    !ifndef MUI_PAGE_CUSTOMFUNCTION_LEAVE
+      !define MUI_PAGE_CUSTOMFUNCTION_LEAVE DshEnsureInstDirExists
+    !endif
 
     Function DshEnsureInstDirExists
       Call DshNormalizeDriveRootFinal
       CreateDirectory "$INSTDIR"
     FunctionEnd
 
-    ; 把 "F:" / "F:\\" 规范成 "F:\\LQ SI"，其余路径不动。
     Function DshNormalizeDriveRootFinal
-      StrLen $9 $INSTDIR
-      ${If} $9 == 2
-        StrCpy $8 $INSTDIR 1 1
-        ${If} $8 == ":"
-          StrCpy $INSTDIR "$INSTDIR\\LQ SI"
-        ${EndIf}
-      ${ElseIf} $9 == 3
-        StrCpy $8 $INSTDIR 1 1
-        StrCpy $7 $INSTDIR 1 2
-        ${If} $8 == ":"
-        ${AndIf} $7 == "\\"
-          StrCpy $INSTDIR "$INSTDIR LQ SI"
-        ${EndIf}
-      ${EndIf}
-    FunctionEnd`
-    text = text.replace(leaveAnchor, replacement)
+      StrCpy $0 $INSTDIR
+      StrLen $1 $0
+      \${If} $1 == 2
+        StrCpy $2 $0 1 1
+        \${If} $2 == ":"
+          StrCpy $INSTDIR "$0\LQ SI"
+        \${EndIf}
+      \${ElseIf} $1 == 3
+        StrCpy $2 $0 1 1
+        StrCpy $3 $0 1 2
+        \${If} $2 == ":"
+        \${AndIf} $3 == "\\"
+          StrCpy $INSTDIR "$0LQ SI"
+        \${EndIf}
+      \${EndIf}
+    FunctionEnd
+`
+    text = `${text.slice(0, insertAt)}${extra}${text.slice(insertAt)}`
     write(rel, text)
     log(`${rel} 已加入盘符根目录自动补名`)
   }
@@ -73,6 +76,9 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
 /* ── 2 首启欢迎弹窗文案 ──────────────────────────────────────────────── */
 {
   const rel = 'packages/dsh-desktop-onboarding/client.js'
+  if (!existsSync(join(repo, rel))) {
+    log(`${rel} 不在仓库里，跳过首启文案`)
+  } else {
   let text = read(rel)
   if (text.includes('LQ SI 桌面版')) {
     log(`${rel} 已是 LQ SI 文案`)
@@ -120,11 +126,15 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
     write(rel, text)
     log(`${rel} 文案已改为 LQ SI（命中 ${hits} 处）`)
   }
+  }
 }
 
 /* ── 3 去掉重复的 DeepSeek 自定义 provider ───────────────────────────── */
 {
   const rel = 'build/dsh-desktop.patch.yml'
+  if (!existsSync(join(repo, rel))) {
+    log(`${rel} 不存在，跳过 provider 清理`)
+  } else {
   let text = read(rel)
   if (!text.includes('LQ SI: DeepSeek 官方标准端点')) {
     log(`${rel} 已无重复 provider 段`)
@@ -138,6 +148,7 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
     text = `${text.slice(0, start)}${text.slice(end)}`
     write(rel, text)
     log(`${rel} 已移除重复 DeepSeek 条目`)
+  }
   }
 }
 
