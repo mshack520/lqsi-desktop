@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, session } from 'electron'
 import { createHash, randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -23,6 +23,7 @@ const DEFAULTS: AnyRecord = {
   requireInteraction: true,
   allowSkip: false,
   sound: false,
+  autoLogin: false,
   voice: false,
   voiceCue: false,
   identity: 'LQ SI 用户',
@@ -151,18 +152,54 @@ export function showStartupStage(owner: BrowserWindow | null): Promise<void> {
     const win = createStageWindow(false)
     stageWindow = win
     let settled = false
+    let destroyed = false
     let timer: NodeJS.Timeout | undefined
+    let autoTimer: NodeJS.Timeout | undefined
+    let handoffTimer: NodeJS.Timeout | undefined
+    const autoLogin = raw.autoLogin === true
 
-    const finish = (): void => {
-      if (settled) return
-      settled = true
-      if (timer) clearTimeout(timer)
-      ipcMain.removeListener(DONE_CHANNEL, onDone)
+    /** 播完之后不立刻黑屏：先在前台盖一层「正在加载工作台」，等主界面真的起来了再退场。 */
+    const showWaitingLayer = (): void => {
+      if (destroyed) return
+      try {
+        void win.webContents.executeJavaScript(
+          `(() => {
+            if (document.getElementById('lqsi-waiting')) return
+            const style = document.createElement('style')
+            style.textContent = '#lqsi-waiting{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#000;color:#fff;font-family:"Segoe UI","Microsoft YaHei",sans-serif;z-index:2147483647}' +
+              '#lqsi-waiting .n{font-size:13px;letter-spacing:.35em;opacity:.75}' +
+              '#lqsi-waiting .s{width:34px;height:34px;border-radius:50%;border:2px solid rgba(217,45,57,.25);border-top-color:#d92d39;animation:lqsiSpin .9s linear infinite}' +
+              '@keyframes lqsiSpin{to{transform:rotate(360deg)}}'
+            document.head.appendChild(style)
+            const box = document.createElement('div')
+            box.id = 'lqsi-waiting'
+            box.innerHTML = '<div class="s"></div><div class="n">正在加载工作台</div>'
+            document.body.appendChild(box)
+            document.body.style.opacity = '1'
+          })()`
+        ).catch(() => undefined)
+      } catch {
+        /* best effort */
+      }
+    }
+
+    const destroyStage = (): void => {
+      if (destroyed) return
+      destroyed = true
+      if (handoffTimer) clearTimeout(handoffTimer)
       try {
         if (!win.isDestroyed()) win.destroy()
       } catch {
         /* window already gone */
       }
+    }
+
+    const finish = (): void => {
+      if (settled) return
+      settled = true
+      if (timer) clearTimeout(timer)
+      if (autoTimer) clearTimeout(autoTimer)
+      ipcMain.removeListener(DONE_CHANNEL, onDone)
       stageWindow = null
       try {
         const next = readRaw()
@@ -177,7 +214,43 @@ export function showStartupStage(owner: BrowserWindow | null): Promise<void> {
       } catch {
         /* focus is best effort */
       }
-      resolve()
+
+      // 主界面就绪交接：先盖等待层，主窗口能显示后再退场（最多等 12 秒）。
+      const ownerUsable = (): boolean => Boolean(owner && !owner.isDestroyed())
+      if (!ownerUsable() || owner!.isVisible()) {
+        destroyStage()
+        resolve()
+        return
+      }
+      showWaitingLayer()
+      const handoff = (): void => {
+        destroyStage()
+        resolve()
+      }
+      const tryHandoff = (): boolean => {
+        if (!ownerUsable()) {
+          handoff()
+          return true
+        }
+        if (owner!.isVisible() && !owner!.webContents.isLoading()) {
+          handoff()
+          return true
+        }
+        return false
+      }
+      owner!.webContents.once('did-finish-load', () => {
+        setTimeout(tryHandoff, 260)
+      })
+      owner!.once('show', () => {
+        setTimeout(tryHandoff, 260)
+      })
+      const poll = setInterval(() => {
+        if (tryHandoff()) clearInterval(poll)
+      }, 200)
+      handoffTimer = setTimeout(() => {
+        clearInterval(poll)
+        handoff()
+      }, 12000)
     }
 
     const onDone = (event: Electron.IpcMainEvent): void => {
@@ -190,7 +263,12 @@ export function showStartupStage(owner: BrowserWindow | null): Promise<void> {
     win.once('ready-to-show', () => {
       if (!settled) win.show()
     })
-    void loadStage(win, false).catch(finish)
+    void loadStage(win, false, autoLogin ? { ...cfg, requireInteraction: false, allowSkip: true } : undefined)
+      .then(() => {
+        // 开了免登录：动画播完自动进入，不需要再点确认。
+        if (autoLogin && !settled) autoTimer = setTimeout(finish, 3200)
+      })
+      .catch(finish)
   })
 }
 
@@ -226,6 +304,37 @@ async function showPreviewStage(): Promise<void> {
 export function registerStartupStageIpc(): void {
   if (registered) return
   registered = true
+
+  // 工作台内嵌第三方系统（MES 等）时，对方常带 X-Frame-Options / CSP frame-ancestors，
+  // 会把 iframe 打死并显示「DSH 无法嵌入此网址」。这里只对 http(s) 响应摘掉这两个头，
+  // 应用自身走 app:// 协议，不受影响。
+  try {
+    const filter = { urls: ['http://*/*', 'https://*/*'] }
+    session.defaultSession.webRequest.onHeadersReceived(filter, (details, callback) => {
+      const headers = { ...(details.responseHeaders ?? {}) }
+      for (const key of Object.keys(headers)) {
+        const lower = key.toLowerCase()
+        if (lower === 'x-frame-options') delete headers[key]
+        if (lower === 'content-security-policy') {
+          const value = headers[key]
+          const list = Array.isArray(value) ? value : [String(value ?? '')]
+          headers[key] = list
+            .map((item) =>
+              item
+                .split(';')
+                .map((part) => part.trim())
+                .filter((part) => part && !part.toLowerCase().startsWith('frame-ancestors'))
+                .join('; ')
+            )
+            .filter((item) => item.length > 0)
+        }
+        if (lower === 'content-security-policy-report-only') delete headers[key]
+      }
+      callback({ responseHeaders: headers })
+    })
+  } catch {
+    /* 注册失败时不影响主流程 */
+  }
 
   ipcMain.handle('lqsi:startup:verify', (_event, passcode: unknown) => ({
     ok: verifyPasscode(String(passcode ?? ''))
