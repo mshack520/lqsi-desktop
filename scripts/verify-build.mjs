@@ -35,7 +35,7 @@ console.log(lines.at(-1))
 
 const BS = String.fromCharCode(92)
 const trimSep = (p) => (p.charAt(0) === BS || p.charAt(0) === '/' ? p.slice(1) : p)
-const posix = (p) => trimSep(p).split(BS).join('/')
+const posix = (p) => '/' + trimSep(p).split(BS).join('/')
 const entries = rawEntries.map(posix)
 const has = (p) => entries.some((e) => e === p || e.endsWith(p))
 const read = (p) => {
