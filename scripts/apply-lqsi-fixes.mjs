@@ -176,7 +176,26 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
       log(`${rel} 已含桥接兜底`)
     } else {
       const fallback =
-        '{LQSI_BRIDGE_FALLBACK}(window.dshDesktop || (window.parent && window.parent.dshDesktop) || (window.top && window.top.dshDesktop))'
+        '(function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()'
+      const next = text.split('window.dshDesktop').join(fallback)
+      write(rel, next)
+      log(`${rel} 已改为多窗口查找 dshDesktop`)
+    }
+  }
+}
+
+/* ── 5 工作台客户端：拿不到 window.dshDesktop 时向上找（内嵌页面用） ── */
+{
+  const rel = 'packages/@scx/dsh-workbench-prototype/lib/client.js'
+  if (!existsSync(join(repo, rel))) {
+    log(`${rel} 不存在，跳过工作台桥接`)
+  } else {
+    const text = read(rel)
+    if (text.includes('{LQSI_BRIDGE_FALLBACK}')) {
+      log(`${rel} 已含桥接兜底`)
+    } else {
+      const fallback =
+        '(function(){try{return window.dshDesktop||(window.parent&&window.parent.dshDesktop)||(window.top&&window.top.dshDesktop)}catch(e){return window.dshDesktop}})()'
       const next = text.split('window.dshDesktop').join(fallback)
       write(rel, next)
       log(`${rel} 已改为多窗口查找 dshDesktop`)
