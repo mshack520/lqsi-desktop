@@ -43,6 +43,27 @@ function writeLogin(next: Record<string, { username: string; password: string }>
   } catch { /* 保存失败不影响网页使用 */ }
 }
 
+/** 用保存过的 MES 账号在网页会话里登录一次，省得每次手动输。 */
+async function attemptAutoLogin(target: WebContentsView, siteUrl: string): Promise<void> {
+  const record = readLogin()[siteUrl]
+  if (!record?.username || !record?.password) return
+  try {
+    const base = new URL(siteUrl)
+    const prefix = base.pathname.replace(/\/$/u, '')
+    const endpoint = `${base.origin}${prefix}/api/auth/login`
+    const ok = await target.webContents.executeJavaScript(
+      `fetch(${JSON.stringify(endpoint)}, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ username: ${JSON.stringify(record.username)}, password: ${JSON.stringify(record.password)} })
+      }).then((r) => r.ok).catch(() => false)`,
+      true,
+    )
+    if (ok === true) target.webContents.reload()
+  } catch { /* 登录失败时保留原页面，让用户手动登录 */ }
+}
+
 function setState(patch: Partial<ViewState>): void {
   state = { ...state, ...patch }
   try { owner?.webContents.send('lqsi:enterprise:status', state) } catch { /* 窗口已关闭 */ }
@@ -64,6 +85,7 @@ function ensureView(target: BrowserWindow, siteUrl: string): WebContentsView {
   created.webContents.on('did-start-loading', () => setState({ loading: true, error: '' }))
   created.webContents.on('did-finish-load', () => {
     setState({ ok: true, loading: false, error: '', url: created.webContents.getURL(), title: created.webContents.getTitle() })
+    if (currentSite) void attemptAutoLogin(created, currentSite)
   })
   created.webContents.on('did-fail-load', (_event, code, description, url, isMainFrame) => {
     if (!isMainFrame || code === -3) return // -3 = 主动取消
