@@ -29,8 +29,13 @@ const has = (p) => entries.some((e) => e === p || e.endsWith(p))
 const read = (p) => {
   const entry = entries.find((e) => e === p || e.endsWith(p))
   if (!entry) return ''
-  return asar.extractFile(asarPath, entry.replace(/^\//u, '')).toString('utf8')
+  try {
+    return asar.extractFile(asarPath, entry.replace(/^\//u, '')).toString('utf8')
+  } catch {
+    return ''
+  }
 }
+const readPattern = (re) => entries.filter((e) => re.test(e)).map(read).join(String.fromCharCode(10))
 
 // 1) 启动舞台与设置窗口的编译产物
 record(has('/out/preload/startup-gate.cjs'), '含启动舞台 preload')
@@ -39,13 +44,13 @@ record(entries.some((e) => e.includes('/out/main/startup-settings')), '含设置
 record(entries.some((e) => e.includes('/out/main/enterprise-view')), '含企业网页视图代码')
 
 // 2) 主进程关键接线
-const mainIndex = read('/out/main/index.js')
+const mainIndex = readPattern(/\/out\/main\/index[^/]*\.js$/)
 record(mainIndex.includes('lqsi://settings'), '主进程接管 lqsi://settings（设置入口）')
 record(mainIndex.includes('lqsi:startup:'), '主进程注册启动舞台 IPC')
 record(mainIndex.includes('启动动画设置'), '菜单含「启动动画设置」')
 
 // 3) 渲染进程桥接（面板/工作台调用得到的方法）
-const preload = read('/out/preload/index.cjs')
+const preload = readPattern(/\/out\/preload\/index[^/]*\.cjs$/)
 for (const name of ['authorizeStartupSettings', 'changeStartupPassword', 'verifyStartupPassword', 'getAutoLaunchSettings', 'getEnterpriseWebsiteStatus', 'reloadEnterpriseWebsite']) {
   record(preload.includes(name), `桥接方法 ${name}`)
 }
