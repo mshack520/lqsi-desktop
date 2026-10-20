@@ -61,5 +61,23 @@ for (const rel of targets) {
   for (const [re, to] of rules) src = src.replace(re, to)
   if (src !== before) { writeFileSync(p, src); total++; console.log('  改写', rel) }
 }
-if (total === 0) throw new Error('[LQ SI] 没有发现可改写的更新源，说明上游代码结构变了，请先核对再发布')
-console.log(`[LQ SI] 更新源已指向 ${base}；策略文件 ${POLICY_URL}`)
+if (total === 0) {
+  // CI also runs this step on the already-branded LQ SI source. In that case
+  // the upstream URLs no longer exist to replace; accept only when the
+  // explicit LQ SI updater and version catalog both point at this repository.
+  const servicePath = join(process.cwd(), 'src/main/desktop-service/service.ts')
+  const catalogPath = join(process.cwd(), 'src/main/update/version-catalog.ts')
+  const service = existsSync(servicePath) ? readFileSync(servicePath, 'utf8') : ''
+  const catalog = existsSync(catalogPath) ? readFileSync(catalogPath, 'utf8') : ''
+  const expectedFeed = `${base}/releases/latest/download/`
+  const alreadyPatched = service.includes('LQSI_CHECK_UPDATE_V4') &&
+    service.includes(repo) &&
+    service.includes('/releases/latest/download/latest.yml') &&
+    catalog.includes(expectedFeed)
+  if (!alreadyPatched) {
+    throw new Error('[LQ SI] 没有发现可改写的更新源，且当前源码也未确认已指向本仓库；请先核对上游结构')
+  }
+  console.log(`[LQ SI] 更新源已指向 ${base}；策略文件 ${POLICY_URL}（已是 LQ SI 配置，无需再次改写）`)
+} else {
+  console.log(`[LQ SI] 更新源已指向 ${base}；策略文件 ${POLICY_URL}`)
+}
