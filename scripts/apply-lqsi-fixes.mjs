@@ -203,16 +203,16 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
   }
 }
 
-/* ── 6 检查更新：直接读 GitHub 最新版清单，不再依赖 raw/中转接口 ───── */
+/* ── 6 检查更新：直读 GitHub 发布清单，并自动挑选可用的下载通道 ───── */
 {
   const rel = 'src/main/desktop-service/service.ts'
-  const marker = 'LQSI_CHECK_UPDATE_V3'
+  const marker = 'LQSI_CHECK_UPDATE_V4'
   if (!existsSync(join(repo, rel))) {
     log(`${rel} 不存在，跳过检查更新改写`)
   } else {
     const text = read(rel)
     if (text.includes(marker)) {
-      log(`${rel} 检查更新已是直读清单`)
+      log(`${rel} 检查更新已带镜像选路`)
     } else {
       const signature = '  async checkUpdate(_manual = false): Promise<UpdateDecision> {'
       const start = text.indexOf(signature)
@@ -222,24 +222,37 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
       for (let index = text.indexOf('{', start); index < text.length; index += 1) {
         const char = text[index]
         if (char === '{') depth += 1
-        else if (char === '}') {
-          depth -= 1
-          if (depth === 0) { end = index + 1; break }
-        }
+        else if (char === '}') { depth -= 1; if (depth === 0) { end = index + 1; break } }
       }
       if (end < 0) fail(`${rel} 无法确定 checkUpdate 范围`)
       const replacement = [
-        '  // ' + marker + ' — LQ SI: 直接读 GitHub 最新发布的 latest.yml。',
+        '  // ' + marker + ' — LQ SI: 直读 latest.yml，并在多个下载通道里挑一个通得过的。',
         '  async checkUpdate(_manual = false): Promise<UpdateDecision> {',
-        "    const manifestUrl = 'https://github.com/mshack520/lqsi-desktop/releases/latest/download/latest.yml'",
-        '    let text = \'\'',
-        '    try {',
-        '      const response = await this.options.request(manifestUrl, { signal: AbortSignal.timeout(8000) })',
-        '      if (!response.ok) return { updateAvailable: false }',
-        '      text = await response.text()',
-        '    } catch {',
-        '      return { updateAvailable: false }',
+        "    const REPO = 'mshack520/lqsi-desktop'",
+        "    const DIRECT = `https://github.com/${REPO}/releases/download/v`",
+        '    const PROXIES = [',
+        "      'https://ghproxy.net/https://github.com/',",
+        "      'https://gh-proxy.com/https://github.com/',",
+        "      'https://ghfast.top/https://github.com/'",
+        '    ]',
+        '    const tryGet = async (url: string): Promise<string | null> => {',
+        '      try {',
+        '        const response = await this.options.request(url, { signal: AbortSignal.timeout(8000) })',
+        '        if (!response.ok) return null',
+        '        return await response.text()',
+        '      } catch {',
+        '        return null',
+        '      }',
         '    }',
+        "    const latestUrl = `https://github.com/${REPO}/releases/latest/download/latest.yml`",
+        '    const manifestUrls = [latestUrl]',
+        '    for (const proxy of PROXIES) manifestUrls.push(`${proxy}github.com/${REPO}/releases/latest/download/latest.yml`)',
+        "    let text: string | null = null",
+        '    for (const url of manifestUrls) {',
+        '      text = await tryGet(url)',
+        '      if (text) break',
+        '    }',
+        '    if (!text) return { updateAvailable: false }',
         '    const matched = /^\s*version:\s*([0-9A-Za-z.+_-]+)/m.exec(text)',
         '    if (!matched) return { updateAvailable: false }',
         '    const remote = matched[1]!.trim()',
@@ -247,15 +260,17 @@ const write = (rel, text) => writeFileSync(join(repo, rel), text, 'utf8')
         '    const current = this.options.version',
         "    if (compareVersions(remote.split('+')[0]!, current.split('+')[0]!) <= 0) return { updateAvailable: false }",
         '    if (!isPrereleaseVersion(current) && isPrereleaseVersion(remote)) return { updateAvailable: false }',
-        '    return {',
-        '      updateAvailable: true,',
-        '      version: remote,',
-        "      feedUrl: `https://github.com/mshack520/lqsi-desktop/releases/download/v${remote}/`",
+        '    const bases = [`${DIRECT}${remote}/`]',
+        "    for (const proxy of PROXIES) bases.push(`${proxy}github.com/${REPO}/releases/download/v${remote}/`)",
+        '    let chosen = bases[0]!',
+        '    for (const base of bases) {',
+        '      if (await tryGet(`${base}latest.yml`)) { chosen = base; break }',
         '    }',
+        '    return { updateAvailable: true, version: remote, feedUrl: chosen }',
         '  }'
       ].join('\n')
       write(rel, text.slice(0, start) + replacement + text.slice(end))
-      log(`${rel} 检查更新改为直读 latest.yml`)
+      log(`${rel} 检查更新改为直读 latest.yml + 镜像选路`)
     }
   }
 }
