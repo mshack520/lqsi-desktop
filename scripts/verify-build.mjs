@@ -31,9 +31,6 @@ try {
   record(false, 'asar 可读取', String(error && error.message ? error.message : error))
 }
 record(rawEntries.length > 0, 'asar 条目数', String(rawEntries.length))
-const outEntries = entries.filter((e) => e.startsWith('/out'))
-lines.push('INFO  /out 条目数  ' + outEntries.length + '  ' + outEntries.slice(0, 8).join(' | '))
-lines.push('INFO  preload 条目  ' + entries.filter((e) => e.includes('/preload/')).slice(0, 8).join(' | '))
 console.log(lines.at(-1))
 
 const BS = String.fromCharCode(92)
@@ -57,6 +54,11 @@ const readPattern = (re) => entries.map((e, i) => (re.test(e) ? i : -1)).filter(
     return ''
   }
 }).join(String.fromCharCode(10))
+
+const outEntries = entries.filter((e) => e.startsWith('/out'))
+lines.push('INFO  /out 条目数  ' + outEntries.length + '  ' + outEntries.slice(0, 6).join(' | '))
+lines.push('INFO  preload 条目  ' + entries.filter((e) => e.includes('/preload/')).slice(0, 6).join(' | '))
+for (const line of lines.slice(-2)) console.log(line)
 
 // 1) 启动舞台与设置窗口的编译产物
 record(has('/out/preload/startup-gate.cjs'), '含启动舞台 preload')
