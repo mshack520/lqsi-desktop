@@ -93,6 +93,9 @@ jobs:
       - name: 写更新策略 policy.json 并提交（放在 Release 之后，保证下载地址已存在）
         shell: bash
         run: |
+          # Release 可从功能分支构建；更新策略必须基于 main 最新提交，不能把功能分支直接推到 main。
+          git fetch origin main
+          git checkout --detach origin/main
           node -e "const fs=require('fs');const v=process.argv[1];fs.mkdirSync('updates',{recursive:true});const p={updateAvailable:true,version:v,feedUrl:'https://github.com/'+process.env.LQSI_REPO+'/releases/download/v'+v+'/'};fs.writeFileSync('updates/policy.json',JSON.stringify(p,null,2)+'\n')" "${{ inputs.version }}"
           cat updates/policy.json
           git config user.name "lqsi-release-bot"
