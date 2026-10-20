@@ -170,23 +170,27 @@ replaceShowSplash('src/main/index.ts')
 /* ── 6 启动时注册 IPC ───────────────────────────────────────────────────── */
 {
   const rel = 'src/main/index.ts'
-  const text = read(rel)
-  const marker = 'module.registerStartupStageIpc()'
-  if (text.includes(marker)) {
-    log(`${rel} 已注册启动舞台 IPC`)
-  } else {
-    write(
-      rel,
-      `${text.trimEnd()}
-
-// LQ SI：启动舞台相关 IPC（启动动画窗口、启动口令、设置页）在模块加载时注册。
-void import('./startup-stage')
-  .then((module) => module.registerStartupStageIpc())
-  .catch(() => undefined)
-`
+  let text = read(rel)
+  const marker = 'LQSI_STARTUP_IPC_AFTER_READY'
+  const legacy = /\r?\n\/\/ LQ SI：启动舞台相关 IPC（启动动画窗口、启动口令、设置页）在模块加载时注册。\r?\nvoid import\('\.\/startup-stage'\)\r?\n  \.then\(\(module\) => module\.registerStartupStageIpc\(\)\)\r?\n  \.catch\(\(\) => undefined\)\r?\n?/g
+  text = text.replace(legacy, '\n')
+  if (!text.includes(marker)) {
+    const bootstrap = 'async function bootstrap(): Promise<void> {'
+    if (!text.includes(bootstrap)) fail(`${rel} 找不到 bootstrap，无法在 app ready 后注册启动舞台 IPC`)
+    const eol = text.includes('\r\n') ? '\r\n' : '\n'
+    text = text.replace(
+      bootstrap,
+      `${bootstrap}${eol}  // app.whenReady() 已完成；此时 defaultSession 可用，先注册口令与设置 IPC，再创建窗口。${eol}  // ${marker}${eol}  const startupStage = await import('./startup-stage')${eol}  startupStage.registerStartupStageIpc()`
     )
-    log(`${rel} 已注册启动舞台 IPC`)
+    write(rel, text)
   }
+  const bootstrapStart = text.indexOf('async function bootstrap(): Promise<void> {')
+  const registration = text.indexOf('startupStage.registerStartupStageIpc()', bootstrapStart)
+  const firstWindow = text.indexOf('  createWindow()', bootstrapStart)
+  if (bootstrapStart < 0 || registration < bootstrapStart || firstWindow < 0 || registration > firstWindow) {
+    fail(`${rel} 启动舞台 IPC 必须在 app ready 后、创建窗口前注册`)
+  }
+  log(`${rel} 已在 app ready 后注册启动舞台 IPC`)
 }
 
 
