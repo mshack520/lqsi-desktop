@@ -100,56 +100,58 @@ const BRIDGE_METHODS = `    getStartupAnimationSettings: (): Promise<any> =>
 }
 
 /* ── 5 showSplash 改为原生舞台 ──────────────────────────────────────────── */
-const NEW_SHOW_SPLASH = `async function showSplash(): Promise<void> {
-  // LQ SI: 保留官方原实现里的启动确认清理，否则重启后会一直等确认而卡住。
-  clearProfileBootConfirmation()
-  const window = mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow()
-  try {
-    const stage = await import('./startup-stage')
-    await stage.showStartupStage(window)
-    return
-  } catch (error) {
-    runtime.note(\`[desktop] LQ SI startup stage unavailable: \${
-      error instanceof Error ? error.message : String(error)
-    }\`)
-  }
-  clearProfileBootConfirmation()
-  const navigationVersion = ++mainWindowNavigationVersion
-  window.webContents.stop()
-  await loadDesktopResource(window, desktopResourcePath('splash.html'), {
-    query: { theme: nativeTheme.shouldUseDarkColors ? 'dark' : 'light' }
-  })
-  if (window.isDestroyed() || navigationVersion !== mainWindowNavigationVersion) return
-  raiseWindowWithoutStealingFocus(window, process.platform, () => app.isActive())
-}`
+const SHOW_SPLASH_MARKER = 'LQSI_SHOW_SPLASH_V2'
+const NEW_SHOW_SPLASH = [
+  'async function showSplash(): Promise<void> {',
+  '  // ' + SHOW_SPLASH_MARKER + ' — LQ SI: 先播启动舞台，再走官方原有加载页流程。',
+  '  clearProfileBootConfirmation()',
+  '  const window = mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow()',
+  '  try {',
+  "    const stage = await import('./startup-stage')",
+  '    await stage.showStartupStage(window)',
+  '  } catch (error) {',
+  '    runtime.note(`[desktop] LQ SI startup stage unavailable: ${',
+  '      error instanceof Error ? error.message : String(error)',
+  '    }`)',
+  '  }',
+  '  const navigationVersion = ++mainWindowNavigationVersion',
+  '  window.webContents.stop()',
+  "  await loadDesktopResource(window, desktopResourcePath('splash.html'), {",
+  "    query: { theme: nativeTheme.shouldUseDarkColors ? 'dark' : 'light' }",
+  '  })',
+  '  if (window.isDestroyed() || navigationVersion !== mainWindowNavigationVersion) return',
+  '  raiseWindowWithoutStealingFocus(window, process.platform, () => app.isActive())',
+  '}'
+].join('\n')
 
-{
-  const rel = 'src/main/index.ts'
+function replaceShowSplash(rel) {
   const text = read(rel)
-  if (text.includes('showStartupStage(window)')) {
+  if (text.includes(SHOW_SPLASH_MARKER)) {
     log(`${rel} showSplash 已接线`)
-  } else {
-    const signature = 'async function showSplash(): Promise<void> {'
-    const start = text.indexOf(signature)
-    if (start < 0) fail(`${rel} 找不到 showSplash`)
-    let depth = 0
-    let end = -1
-    for (let index = text.indexOf('{', start); index < text.length; index += 1) {
-      const char = text[index]
-      if (char === '{') depth += 1
-      else if (char === '}') {
-        depth -= 1
-        if (depth === 0) {
-          end = index + 1
-          break
-        }
+    return
+  }
+  const signature = 'async function showSplash(): Promise<void> {'
+  const start = text.indexOf(signature)
+  if (start < 0) fail(`${rel} 找不到 showSplash`)
+  let depth = 0
+  let end = -1
+  for (let index = text.indexOf('{', start); index < text.length; index += 1) {
+    const char = text[index]
+    if (char === '{') depth += 1
+    else if (char === '}') {
+      depth -= 1
+      if (depth === 0) {
+        end = index + 1
+        break
       }
     }
-    if (end < 0) fail(`${rel} showSplash 花括号不闭合`)
-    write(rel, `${text.slice(0, start)}${NEW_SHOW_SPLASH}${text.slice(end)}`)
-    log(`${rel} showSplash 已改为原生启动舞台`)
   }
+  if (end < 0) fail(`${rel} showSplash 花括号不闭合`)
+  write(rel, `${text.slice(0, start)}${NEW_SHOW_SPLASH}${text.slice(end)}`)
+  log(`${rel} showSplash 已改为原生启动舞台`)
 }
+
+replaceShowSplash('src/main/index.ts')
 
 /* ── 6 启动时注册 IPC ───────────────────────────────────────────────────── */
 {
