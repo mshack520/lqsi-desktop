@@ -113,6 +113,9 @@ export async function prepareOfficeRuntime({ target = officeTarget(), output = j
     await writeFile(join(runtime, 'runtime.json'), `${JSON.stringify(manifest, null, 2)}\n`)
     const skillRoot = dirname(require.resolve('@deepseek-ai/dsh-skill-office/package.json'))
     await cp(join(skillRoot, 'assets'), join(staging, 'office-skills'), { recursive: true, dereference: true })
+    const checker = join(staging, 'office-skills', 'scripts', 'check_office.py')
+    await mkdir(dirname(checker), { recursive: true })
+    await cp(join(project, 'scripts/office-runtime/check_office.py'), checker)
     await cp(join(project, 'packages/dsh-desktop-office/business-skills'), join(staging, 'business-skills'), { recursive: true })
     // Keep upstream skills intact; add the Windows packaging constraint at the
     // generated deployment boundary, where all three workflows can see it.
