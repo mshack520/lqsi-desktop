@@ -1,8 +1,15 @@
 /** Run on the packaged Electron runtime, resolving every service from app.asar. */
 const { createRequire } = require('node:module')
-const { join } = require('node:path')
+const { join, resolve } = require('node:path')
 const { pathToFileURL } = require('node:url')
 const assert = require('node:assert/strict')
+
+function assertResourceUnder(resourcePath, resourceRoot, label) {
+  const normalize = value => resolve(value).replaceAll('\\', '/').replace(/\/+$/u, '').toLowerCase()
+  const target = normalize(resourcePath)
+  const root = normalize(resourceRoot)
+  assert(target.startsWith(`${root}/`), `${label} resource path must be under ${resourceRoot}: ${resourcePath}`)
+}
 
 async function probe(appRoot, resources) {
   const host = createRequire(join(appRoot, 'package.json'))
@@ -22,7 +29,7 @@ async function probe(appRoot, resources) {
     for (const name of ['gov-doc-writing', 'meeting-recap', 'work-report-writer', 'research-writer', 'saas-metrics-coach', 'dataset-health-audit', 'data-viz-gen']) {
       const skill = await ctx.skills.get(name)
       assert(skill, `Missing business skill ${name}`)
-      assert(skill.resourceBase.path.startsWith(join(resources, 'office-runtime', 'business-skills')))
+      assertResourceUnder(skill.resourceBase.path, join(resources, 'office-runtime', 'business-skills'), name)
     }
     const entry = pathToFileURL(host.resolve('dsh-desktop-office'))
     const { createTemplateLibrary } = await import(new URL('./lib/templates.js', entry).href)
@@ -41,7 +48,7 @@ async function probe(appRoot, resources) {
     for (const name of ['office-docx', 'office-pptx', 'office-xlsx']) {
       assert(skills.some(skill => skill.name === name), `Missing packaged Office skill ${name}`)
       const skill = await ctx.skills.get(name)
-      assert(skill.resourceBase.path.startsWith(join(resources, 'office-runtime', 'office-skills')))
+      assertResourceUnder(skill.resourceBase.path, join(resources, 'office-runtime', 'office-skills'), name)
       // Upstream supplies command paths as JSON, escaping Windows separators.
       assert(skill.content.includes(JSON.stringify(process.execPath)), 'Office CLI must use the current Electron runtime')
       assert(skill.content.includes(JSON.stringify(join(resources, 'office-cli.mjs'))), 'Office CLI must resolve from the current installation')
