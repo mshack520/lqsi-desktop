@@ -96,7 +96,9 @@ jobs:
         run: |
           # Release 可从功能分支构建；更新策略必须基于 main 最新提交，不能把功能分支直接推到 main。
           git fetch origin main
-          git checkout --detach origin/main
+          # npm version updates package.json and package-lock.json in this job's checkout.
+          # Discard those build-only edits before switching to the policy branch.
+          git checkout --detach --force origin/main
           node -e "const fs=require('fs');const v=process.argv[1];fs.mkdirSync('updates',{recursive:true});const p={updateAvailable:true,version:v,feedUrl:'https://github.com/'+process.env.LQSI_REPO+'/releases/download/v'+v+'/'};fs.writeFileSync('updates/policy.json',JSON.stringify(p,null,2)+'\n')" "${{ inputs.version }}"
           cat updates/policy.json
           git config user.name "lqsi-release-bot"
