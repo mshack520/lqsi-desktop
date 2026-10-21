@@ -58,7 +58,7 @@ export async function renderOfficeTemplatePreview(project, directory, longEdge, 
       signal, async (image, pageCount) => {
         signal?.throwIfAborted();
         if (pageCount !== batch.count || image.page !== expected)
-          throw new Error('Office template preview page count mismatch');
+          throw new Error(`Office template preview page count mismatch: batch=${batch.first}+${batch.count}, reported=${pageCount}, image.page=${image.page}, expected=${expected}`);
         const slideNumber = batch.first + expected, target = path.join(destination, `page-${slideNumber}.png`);
         await copyFile(image.path, target);
         if (slideNumber === 1) timings.firstPageMs = Date.now() - started;
@@ -68,7 +68,7 @@ export async function renderOfficeTemplatePreview(project, directory, longEdge, 
       timings.rasterMs += Date.now() - rasterStarted;
       if (rendered.pageCount !== batch.count || rendered.images.length !== batch.count || expected !== batch.count + 1
         || rendered.images.some((image, index) => image.page !== index + 1))
-        throw new Error('Office template preview page count mismatch');
+        throw new Error(`Office template preview page count mismatch: batch=${batch.first}+${batch.count}, reported=${rendered.pageCount}, images=${rendered.images.length}, callbacks=${expected - 1}, pages=${JSON.stringify(rendered.images.map(({ page, index }) => ({ page, index })))}`);
       await rm(batch.directory, { recursive: true, force: true });
     };
     // Finish and publish the cover before starting another Office job.
