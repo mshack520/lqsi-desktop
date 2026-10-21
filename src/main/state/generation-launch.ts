@@ -1,13 +1,9 @@
 import { existsSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import {
   initProfile,
   PROFILE_TEMPLATES,
-  readProfileManifest,
-  resolveProfileDir,
-  writeProfileBundles
+  resolveProfileDir
 } from '@deepseek-ai/dsh-app-boot'
 import {
   disableGeneration,
@@ -27,50 +23,6 @@ import { projectGenerations } from 'dsh-desktop-market-installer/generations/pro
  */
 
 type Note = (line: string) => void
-
-const PREINSTALLED_BUNDLES = ['dsh-mnemon', '@xmanrui/dsh-im'] as const
-const PREINSTALL_MARKER = '.lqsi-preinstalled-bundles.json'
-const requireFromDesktop = createRequire(import.meta.url)
-
-/**
- * Seed bundled third-party plugins into an existing web profile once. The
- * marker preserves an intentional later uninstall across application restarts.
- */
-async function seedPreinstalledBundles(profileDir: string, note: Note): Promise<void> {
-  const markerPath = join(profileDir, PREINSTALL_MARKER)
-  if (existsSync(markerPath)) return
-
-  const manifest = readProfileManifest('dsh-desktop', profileDir)
-  const current = manifest.dsh?.profile?.bundles ?? []
-  const available: string[] = []
-  for (const packageName of PREINSTALLED_BUNDLES) {
-    try {
-      const packageJsonPath = requireFromDesktop.resolve(`${packageName}/package.json`)
-      const packageManifest = JSON.parse(await readFile(packageJsonPath, 'utf8')) as {
-        name?: string
-        dsh?: { bundle?: { patch?: unknown } }
-      }
-      if (packageManifest.name !== packageName || packageManifest.dsh?.bundle?.patch === undefined) {
-        throw new Error(`${packageName} is not a DSH bundle`)
-      }
-      available.push(packageName)
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`预装插件 ${packageName} 无法从安装包读取：${detail}`, { cause: error })
-    }
-  }
-
-  const seeded = [...current]
-  for (const packageName of available) {
-    if (!seeded.includes(packageName)) seeded.push(packageName)
-  }
-  if (seeded.length !== current.length) {
-    writeProfileBundles(profileDir, manifest, seeded)
-    note(`[desktop] preinstalled bundles added to web profile: ${available.join(', ')}`)
-  }
-
-  await writeFile(markerPath, `${JSON.stringify({ version: 1, packages: available }, null, 2)}\n`, 'utf8')
-}
 
 /**
  * Run once per launch while Harness is stopped: physically remove staging
@@ -99,7 +51,6 @@ export async function prepareGenerationsForLaunch(dshHome: string, note: Note): 
     if (template === undefined) throw new Error('Harness does not define the web profile template')
     initProfile(profileDir, template.bundles)
   }
-  await seedPreinstalledBundles(profileDir, note)
   try {
     const projection = await projectGenerations(dshHome)
     if (projection.linked.length > 0 || projection.unlinked.length > 0) {
