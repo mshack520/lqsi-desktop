@@ -13,7 +13,7 @@ const releaseAssets = [
 ]
 
 /** The exact Harness build every `@deepseek-ai/dsh-*` production dep is pinned to. */
-const HARNESS_VERSION = '0.2.0-rc.2'
+const HARNESS_VERSION = '0.2.1-rc.2'
 
 describe('GitHub release contract', () => {
   it('keeps the package and lockfile versions aligned', async () => {
@@ -86,8 +86,13 @@ describe('GitHub release contract', () => {
     // `@deepseek-ai/dsh-*` dep is pinned to one exact version and every
     // resolution carries an integrity hash — `npm ci` stays reproducible
     // without vendoring tarballs into the repository.
+    const packagesWithoutThisHarnessRelease = new Set([
+      '@deepseek-ai/dsh-invariants',
+      '@deepseek-ai/dsh-subagent-in-process-driver'
+    ])
     const harnessDeps = Object.entries(packageJson.dependencies).filter(
-      ([name]) => name.startsWith('@deepseek-ai/dsh')
+      ([name]) =>
+        name.startsWith('@deepseek-ai/dsh') && !packagesWithoutThisHarnessRelease.has(name)
     )
     expect(harnessDeps.length).toBeGreaterThan(200)
     for (const [name, range] of harnessDeps) {
@@ -95,6 +100,10 @@ describe('GitHub release contract', () => {
       const entry = packageLock.packages[`node_modules/${name}`]
       expect(entry?.resolved, name).toMatch(/^https?:\/\//)
       expect(entry?.integrity, name).toMatch(/^sha\d+-/)
+    }
+
+    for (const name of packagesWithoutThisHarnessRelease) {
+      expect(packageJson.dependencies[name], name).toBe('0.2.0-rc.2')
     }
 
     // The vendored-tarball layout is gone; nothing may resolve from it.

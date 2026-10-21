@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号（必须大于当前 0.12.27，例如 0.12.28）'
+        description: '版本号（必须大于当前 0.12.28，例如 0.12.29）'
         required: true
-        default: '0.12.28'
+        default: '0.12.29'
 
 permissions:
   contents: write

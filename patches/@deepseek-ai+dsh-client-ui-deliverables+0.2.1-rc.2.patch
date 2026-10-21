@@ -1,0 +1,32 @@
+diff --git a/node_modules/@deepseek-ai/dsh-client-ui-deliverables/lib/client.js b/node_modules/@deepseek-ai/dsh-client-ui-deliverables/lib/client.js
+index f78467a..6f98730 100644
+--- a/node_modules/@deepseek-ai/dsh-client-ui-deliverables/lib/client.js
++++ b/node_modules/@deepseek-ai/dsh-client-ui-deliverables/lib/client.js
+@@ -2122,6 +2122,7 @@ window.__ModuleLoader__.load({
+ 			"presented.hostError": "无法读取主机桌面信息",
+ 			"presented.preview": "在侧边栏预览",
+ 			"presented.previewButton": "在侧边栏打开 {name}",
++			"presented.openFolder": "在文件管理器中打开 {name}",
+ 			"presented.previewCard": "在侧边栏预览 {name}",
+ 			"presented.all": "全部 {count} 个文件",
+ 			"presented.expandAria": "展开全部 {count} 个交付文件",
+@@ -2185,6 +2186,7 @@ window.__ModuleLoader__.load({
+ 			"presented.hostError": "Could not read the Host desktop information",
+ 			"presented.preview": "Preview in sidebar",
+ 			"presented.previewButton": "Open {name} in sidebar",
++			"presented.openFolder": "Open {name} in file manager",
+ 			"presented.previewCard": "Preview {name} in sidebar",
+ 			"presented.all": "All {count} files",
+ 			"presented.expandAria": "Show all {count} delivered files",
+diff --git a/node_modules/@deepseek-ai/dsh-client-ui-deliverables/lib/types/client/locales.d.ts b/node_modules/@deepseek-ai/dsh-client-ui-deliverables/lib/types/client/locales.d.ts
+index 95c6759..188ad80 100644
+--- a/node_modules/@deepseek-ai/dsh-client-ui-deliverables/lib/types/client/locales.d.ts
++++ b/node_modules/@deepseek-ai/dsh-client-ui-deliverables/lib/types/client/locales.d.ts
+@@ -15,6 +15,7 @@ export declare const zh: {
+     'presented.hostError': string;
+     'presented.preview': string;
+     'presented.previewButton': string;
++    'presented.openFolder': string;
+     'presented.previewCard': string;
+     'presented.all': string;
+     'presented.expandAria': string;

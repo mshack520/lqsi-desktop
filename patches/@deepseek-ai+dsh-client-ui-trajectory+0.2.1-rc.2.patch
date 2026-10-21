@@ -1,0 +1,13 @@
+diff --git a/node_modules/@deepseek-ai/dsh-client-ui-trajectory/lib/client.js b/node_modules/@deepseek-ai/dsh-client-ui-trajectory/lib/client.js
+index b4e6061..99bfdc0 100644
+--- a/node_modules/@deepseek-ai/dsh-client-ui-trajectory/lib/client.js
++++ b/node_modules/@deepseek-ai/dsh-client-ui-trajectory/lib/client.js
+@@ -3865,6 +3865,8 @@ window.__ModuleLoader__.load({
+ 		}
+ 		function requestErrorMessage(request, t) {
+ 			if (request.errorCode === "AUTH") return t("details.failure.auth");
++			if (request.errorCode === "QUOTA") return t("details.failure.quota");
++			if (request.errorCode === "FORBIDDEN") return t("details.failure.forbidden");
+ 			if (request.error === "trajectory.compaction-interrupted") return t("layout.compactionInterrupted");
+ 			return request.error;
+ 		}

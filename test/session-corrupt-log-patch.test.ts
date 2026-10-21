@@ -4,7 +4,8 @@ import path from 'node:path'
 import { zstdCompressSync } from 'node:zlib'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import '@deepseek-ai/dsh-session-persistence'
+import { apply as JsonlSessionPersistence } from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { describe, expect, it, vi } from 'vitest'
 
 async function findLog(root: string, id: string): Promise<string> {

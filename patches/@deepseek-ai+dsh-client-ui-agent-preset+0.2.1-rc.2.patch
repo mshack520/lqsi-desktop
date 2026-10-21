@@ -1,0 +1,70 @@
+diff --git a/node_modules/@deepseek-ai/dsh-client-ui-agent-preset/lib/client.js b/node_modules/@deepseek-ai/dsh-client-ui-agent-preset/lib/client.js
+index af47dcc..7ed2b7b 100644
+--- a/node_modules/@deepseek-ai/dsh-client-ui-agent-preset/lib/client.js
++++ b/node_modules/@deepseek-ai/dsh-client-ui-agent-preset/lib/client.js
+@@ -905,6 +905,7 @@ window.__ModuleLoader__.load({
+ 		/** Locale bundles for the agent-preset hero chip, header label, and management section. */
+ 		/** English copy. */
+ 		const en = {
++            desktopImport: "Import", desktopAwesome: "Awesome preset", desktopSearch: "Search presets",
+ 			...guideEn,
+ 			builtInGroup: "Built-in",
+ 			customGroup: "Custom",
+@@ -937,6 +938,7 @@ window.__ModuleLoader__.load({
+ 		};
+ 		/** Simplified Chinese copy. */
+ 		const zh = {
++            desktopImport: "导入", desktopAwesome: "Awesome preset", desktopSearch: "搜索预设",
+ 			...guideZh,
+ 			builtInGroup: "内置",
+ 			customGroup: "自定义",
+@@ -1844,7 +1846,13 @@ window.__ModuleLoader__.load({
+ 														view(row.id);
+ 													},
+ 													children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconBrowseOutlineRegular, {})
+-												})]
++											}), !builtIn && (0, react_jsx_runtime.jsx)("button", {
++												type: "button",
++												"aria-label": `${copy.export}: ${display.name}`,
++												title: copy.export,
++												onClick: () => { void exportPreset(row.id); },
++												children: copy.export
++											})]
+ 											})]
+ 										}, row.id);
+ 									})
+@@ -1861,6 +1869,34 @@ window.__ModuleLoader__.load({
+ 							setGuide(null);
+ 						}
+ 					}),
++					(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
++						open: importDraft !== null,
++						onClose: () => { if (!importBusy) { setImportDraft(null); setImportFile(null); setTransferError(null); } },
++						closeLabel: copy.cancel,
++						title: copy.import,
++						footer: (0, react_jsx_runtime.jsxs)("div", {
++							style: { display: "flex", gap: 8, justifyContent: "flex-end" },
++							children: [
++								(0, react_jsx_runtime.jsx)("button", { type: "button", disabled: importBusy, onClick: () => { setImportDraft(null); setImportFile(null); setTransferError(null); }, children: copy.cancel }),
++								(0, react_jsx_runtime.jsx)("button", {
++									type: "button", disabled: importBusy || !/^[a-z0-9][a-z0-9-]*$/.test(importId.trim().toLowerCase()) || importDraft?.conflict && importId.trim().toLowerCase() === importDraft.agentPreset,
++									onClick: () => { void confirmImport(); }, children: copy.install
++								})
++							]
++						}),
++						children: importDraft === null ? null : (0, react_jsx_runtime.jsxs)("div", {
++							style: { display: "grid", gap: 12 },
++							children: [
++								(0, react_jsx_runtime.jsx)("strong", { children: importDraft.name }),
++								(0, react_jsx_runtime.jsx)("p", { children: `${importDraft.fileCount} files · ${importDraft.sourceDshVersion ?? "unknown version"}` }),
++								(0, react_jsx_runtime.jsx)("p", { children: copy.trust }),
++								importDraft.warnings?.length > 0 && (0, react_jsx_runtime.jsx)("p", { role: "alert", children: importDraft.warnings.join(", ") }),
++								(0, react_jsx_runtime.jsxs)("label", { children: [copy.rename, (0, react_jsx_runtime.jsx)("input", { value: importId, onChange: (event) => setImportId(event.target.value), style: { display: "block", width: "100%" } })] }),
++								importDraft.conflict && importId.trim().toLowerCase() === importDraft.agentPreset && (0, react_jsx_runtime.jsx)("p", { role: "alert", children: copy.conflict }),
++								transferError && (0, react_jsx_runtime.jsx)("p", { role: "alert", children: transferError })
++							]
++						})
++				}),
+ 					(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+ 						open: viewed !== null,
+ 						onClose: closeViewer,

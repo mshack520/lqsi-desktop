@@ -1,0 +1,86 @@
+diff --git a/node_modules/@deepseek-ai/dsh-plugin-manager/lib/index.js b/node_modules/@deepseek-ai/dsh-plugin-manager/lib/index.js
+index f010583..29e2a7d 100644
+--- a/node_modules/@deepseek-ai/dsh-plugin-manager/lib/index.js
++++ b/node_modules/@deepseek-ai/dsh-plugin-manager/lib/index.js
+@@ -791,11 +791,16 @@ async function runProfilePnpm(context, args, options) {
+ * @returns The registry URL as pnpm printed it, or null when pnpm did not answer with one.
+ */
+ async function readProfileRegistry(dir, options) {
++	// Windows: the default (global) `config get registry` shells out to npm.cmd,
++	// and that .cmd is wrapped in a visible cmd.exe. Project location reads the
++	// already-merged registry in-process, so opening Add Plugin does not flash
++	// a console. Other platforms keep the upstream invocation.
+ 	const result = await execa(options.command ?? "pnpm", [
+ 		...options.args ?? [],
+ 		"config",
+ 		"get",
+-		"registry"
++		"registry",
++		...process.platform === "win32" ? ["--location=project"] : []
+ 	], {
+ 		cwd: dir,
+ 		env: {
+@@ -2200,6 +2205,33 @@ let PluginManager = (() => {
+ 				overrides: [...new Set(patches.flatMap((item) => item.insert === void 0 && typeof item.id === "string" && !declared.has(item.id) ? [item.id] : []))]
+ 			};
+ 		}
++		/** Persist a bundle switch in the host's package-level state, which launch reconciliation cannot revert. */
++		async recordBundleSwitch(name, enabled) {
++			const backend = this.ownerContext.get("profileBundlePackageBackend");
++			if (backend?.switched === void 0) return;
++			let rowIds = [];
++			try {
++				rowIds = this.bundleRows(name).map((row) => row.id).filter((id) => typeof id === "string");
++			} catch (_error) {
++				// An unreadable patch still has a package switch; only its row overrides stay as they are.
++			}
++			await backend.switched({
++				name,
++				enabled,
++				rowIds
++			});
++		}
++		/** Emit host backend output through the same remote event contract as pnpm. */
++		emitPackageOutput(requestId, text, stream, argv) {
++			this.ownerContext.emit("plugin-manager/install-log", {
++				...requestId === void 0 ? {} : { requestId },
++				jobId: randomUUID(),
++				argv,
++				cwd: this.profile.dir,
++				stream,
++				text
++			});
++		}
+ 		/** Run one pnpm command in the profile, streaming its output as install-log chunks. */
+ 		async runPnpm(args, signal, requestId) {
+ 			const jobId = randomUUID();
+@@ -2285,7 +2317,7 @@ let PluginManager = (() => {
+ 				if (metadata === void 0) throw new ManagementFailure("not-bundle");
+ 				if (enabled) {
+ 					const compatibility = evaluatePluginCompatibility(metadata, readProfileVersionExemptions(this.profile.dir));
+-					if (compatibility !== void 0 && !compatibility.exempted) throw new ManagementFailure("incompatible-version", [incompatiblePlugin(compatibility)]);
++					if (compatibility !== void 0 && !compatibility.exempted) reportPluginCompatibility(compatibility);
+ 					this.bundleRows(name);
+ 				}
+ 			}
+diff --git a/node_modules/@deepseek-ai/dsh-plugin-manager/lib/types/index.d.ts b/node_modules/@deepseek-ai/dsh-plugin-manager/lib/types/index.d.ts
+index ba39109..7ebd975 100644
+--- a/node_modules/@deepseek-ai/dsh-plugin-manager/lib/types/index.d.ts
++++ b/node_modules/@deepseek-ai/dsh-plugin-manager/lib/types/index.d.ts
+@@ -6,6 +6,16 @@ export type * from './types.ts';
+ export { classifyInstallFailure, type InstallFailureFacts } from './install-failure.ts';
+ export { InvalidInstallSpecError, parseInstallSpec, type ParsedInstallSpec } from './install-spec.ts';
+ /** The pnpm executable, registries, and limits for diagnostics, lookups and connection checks. */
++/** Host-owned package mutation backend for immutable Desktop generations. */
++export interface ProfileBundlePackageBackend {
++    install(request: { spec: string; kind: 'registry' | 'path' | 'git' | 'tarball'; path?: string; registry?: string; expectedName?: string; signal: AbortSignal; onOutput(text: string, stream: 'stdout' | 'stderr'): void; }): Promise<{ packageResult: import('./types.ts').PackageResult; bundle?: string; replaced?: boolean; pendingBuilds?: string[]; rollback?(): Promise<void>; commit?(): void; } | undefined>;
++    /** Resolves undefined when the package is not the backend's to remove; Plugin Manager then uses pnpm. */
++    remove(request: { name: string; signal: AbortSignal; onOutput(text: string, stream: 'stdout' | 'stderr'): void; }): Promise<{ packageResult: import('./types.ts').PackageResult; } | undefined>;
++    /** Persist a package-level switch that launch reconciliation of `dsh.profile.bundles` cannot revert. */
++    switched?(request: { name: string; enabled: boolean; rowIds: string[]; }): Promise<void>;
++    /** Forget host state for a package that was removed. */
++    removed?(request: { name: string; }): Promise<void>;
++}
+ export interface Config {
+     /** The pnpm executable name or path; resolved through `PATH` like the `dsh plugin` command. */
+     pnpmCommand?: string;

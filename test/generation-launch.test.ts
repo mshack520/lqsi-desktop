@@ -62,7 +62,11 @@ describe('the launch-process half of the generation model', () => {
     const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
     const template = PROFILE_TEMPLATES.web
     expect(template).toBeDefined()
-    expect(manifest.dsh.profile.bundles).toEqual(template?.bundles)
+    expect(manifest.dsh.profile.bundles).toEqual([
+      ...(template?.bundles ?? []),
+      'dsh-mnemon',
+      '@xmanrui/dsh-im'
+    ])
     expect(await readFile(join(profileDir, 'cordis.patch.yml'), 'utf8')).toContain('[]')
     expect(await readFile(join(profileDir, 'pnpm-workspace.yaml'), 'utf8')).toContain(
       'nodeLinker: hoisted'

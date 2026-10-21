@@ -1,0 +1,75 @@
+diff --git a/node_modules/@deepseek-ai/dsh-api-remotes/lib/client.js b/node_modules/@deepseek-ai/dsh-api-remotes/lib/client.js
+index 82b457d..e65ebed 100644
+--- a/node_modules/@deepseek-ai/dsh-api-remotes/lib/client.js
++++ b/node_modules/@deepseek-ai/dsh-api-remotes/lib/client.js
+@@ -13705,6 +13705,14 @@ window.__ModuleLoader__.load({
+ 			"sessionId": zod.z.string().readonly().describe("The created or reused Session, which may differ from the requested `sessionId`."),
+ 			"agentPreset": zod.z.string().readonly().optional().describe("Preset the Session runs, when the deployment composes a preset roster.")
+ 		});
++		let _deepseek_ai_dsh_api_session_controller_session_delete_parameter_0$schema$value;
++		const _deepseek_ai_dsh_api_session_controller_session_delete_parameter_0$schema = () => _deepseek_ai_dsh_api_session_controller_session_delete_parameter_0$schema$value ??= zod.z.object({
++			"sessionId": zod.z.string().readonly()
++		});
++		let _deepseek_ai_dsh_api_session_controller_session_delete_result$schema$value;
++		const _deepseek_ai_dsh_api_session_controller_session_delete_result$schema = () => _deepseek_ai_dsh_api_session_controller_session_delete_result$schema$value ??= zod.z.object({
++			"deleted": zod.z.literal(true).readonly()
++		});
+ 		let _deepseek_ai_dsh_api_session_controller_session_follow_parameter_0$schema$value;
+ 		const _deepseek_ai_dsh_api_session_controller_session_follow_parameter_0$schema = () => _deepseek_ai_dsh_api_session_controller_session_follow_parameter_0$schema$value ??= zod.z.object({
+ 			"address": zod.z.union([zod.z.object({
+@@ -15330,6 +15338,55 @@ window.__ModuleLoader__.load({
+ 						"column": 3
+ 					}
+ 				},
++				"session/delete": {
++					service: "sessionController",
++					description: "Permanently delete one ordinary Session while retaining Workspace files.",
++					invocation: { kind: "direct" },
++					parameters: [{
++						name: "request",
++						description: "the Session identity to delete.",
++						source: "json",
++						codec: {
++							mode: "strict",
++							typeSymbol: "@deepseek-ai/dsh-api-session-controller/types#SessionDeleteRequest",
++							create: _deepseek_ai_dsh_api_session_controller_session_delete_parameter_0$schema,
++							jsonSchema: {
++								"type": "object",
++								"properties": { "sessionId": { "type": "string" } },
++								"required": ["sessionId"],
++								"additionalProperties": true
++							}
++						},
++						strictCodec: {
++							mode: "strict",
++							typeSymbol: "@deepseek-ai/dsh-api-session-controller/types#SessionDeleteRequest",
++							create: _deepseek_ai_dsh_api_session_controller_session_delete_parameter_0$schema,
++							jsonSchema: {
++								"type": "object",
++								"properties": { "sessionId": { "type": "string" } },
++								"required": ["sessionId"],
++								"additionalProperties": false
++							}
++						}
++					}],
++					result: {
++						mode: "strict",
++						typeSymbol: "@deepseek-ai/dsh-api-session-controller/types#SessionDeleteValue",
++						create: _deepseek_ai_dsh_api_session_controller_session_delete_result$schema,
++						description: "confirmation that the Session was deleted.",
++						jsonSchema: {
++							"type": "object",
++							"properties": { "deleted": { "type": "boolean", "const": true } },
++							"required": ["deleted"],
++							"additionalProperties": true
++						}
++					},
++					sourceLocation: {
++						"file": "packages/api/session-controller/src/index.ts",
++						"line": 312,
++						"column": 3
++					}
++				},
+ 				"session/follow": {
+ 					service: "sessionController",
+ 					description: "Follow one Session log from its opening or resume cursor.",
