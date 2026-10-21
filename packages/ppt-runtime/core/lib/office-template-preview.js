@@ -52,10 +52,9 @@ export async function renderOfficeTemplatePreview(project, directory, longEdge, 
     const paint = async batch => {
       const outputDir = path.join(batch.directory, 'pages'), rasterStarted = Date.now();
       let expected = 1;
+      const publishedPages = new Set();
       const pages = Array.from({ length: batch.count }, (_, index) => index + 1);
-      const rendered = await raster.renderImages({ inputPath: batch.pdf, outputDir, pages,
-        dpi: Math.max(24, Math.min(600, longEdge / Math.max(project.width, project.height) * 72)), maxPages },
-      signal, async (image, pageCount) => {
+      const publish = async (image, pageCount) => {
         signal?.throwIfAborted();
         if (pageCount !== batch.count || image.page !== expected)
           throw new Error(`Office template preview page count mismatch: batch=${batch.first}+${batch.count}, reported=${pageCount}, image.page=${image.page}, expected=${expected}`);
@@ -63,8 +62,18 @@ export async function renderOfficeTemplatePreview(project, directory, longEdge, 
         await copyFile(image.path, target);
         if (slideNumber === 1) timings.firstPageMs = Date.now() - started;
         await onPage?.({ page: slideNumber, total: project.pages.length, path: target });
+        publishedPages.add(image.page);
         expected++;
-      });
+      };
+      const rendered = await raster.renderImages({ inputPath: batch.pdf, outputDir, pages,
+        dpi: Math.max(24, Math.min(600, longEdge / Math.max(project.width, project.height) * 72)), maxPages },
+      signal, publish);
+      // Older LibreOffice Kit builds return their image manifest without
+      // invoking the optional progress callback. Publish those rendered pages
+      // from the completed result so previews still appear and are verified.
+      for (const image of rendered.images) {
+        if (!publishedPages.has(image.page)) await publish(image, rendered.pageCount);
+      }
       timings.rasterMs += Date.now() - rasterStarted;
       if (rendered.pageCount !== batch.count || rendered.images.length !== batch.count || expected !== batch.count + 1
         || rendered.images.some((image, index) => image.page !== index + 1))
