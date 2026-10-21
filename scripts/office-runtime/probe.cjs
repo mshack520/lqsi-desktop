@@ -49,6 +49,13 @@ async function probe(appRoot, resources) {
       assert(skills.some(skill => skill.name === name), `Missing packaged Office skill ${name}`)
       const skill = await ctx.skills.get(name)
       assertResourceUnder(skill.resourceBase.path, join(resources, 'office-runtime', 'office-skills'), name)
+    }
+    // The upstream runtime commands are documented by the render/recalculate/export skills,
+    // not by the authoring skills above.
+    for (const name of ['office-render', 'office-recalculate', 'office-export-pdf']) {
+      const skill = await ctx.skills.get(name)
+      assert(skill, `Missing packaged Office runtime skill ${name}`)
+      assertResourceUnder(skill.resourceBase.path, join(resources, 'office-runtime', 'office-skills'), name)
       // Upstream supplies command paths as JSON, escaping Windows separators.
       assert(skill.content.includes(JSON.stringify(process.execPath)), 'Office CLI must use the current Electron runtime')
       assert(skill.content.includes(JSON.stringify(join(resources, 'office-cli.mjs'))), 'Office CLI must resolve from the current installation')
